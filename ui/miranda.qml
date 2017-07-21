@@ -2,52 +2,133 @@ import QtQuick 2.7
 import QtQuick.Controls 2.1
 import QtQuick.Controls.Material 2.1
 import QtQuick.Layouts 1.3
-import cupi.ui 1.0 as QP
+import QtQuick.Window 2.2
 import "controls" as M
 
 ApplicationWindow {
     id: window
-    width: 1000
-    height: 800
+    x: 0
+    y: 0
+    width: Screen.desktopAvailableWidth
+    height: Screen.desktopAvailableHeight
     visible: true
 
     Material.theme: Material.Dark
+
+    Component.onCompleted: dbConnectionDialog.accepted()
 
     function newDatabaseView() {
         var view = Qt.createQmlObject("import QtQuick 2.7; DatabaseView {}", contentStack)
     }
 
-    ImportDialog {
-        id: importDialog
+    // Dialogs
+    DBConnectionDialog {
+        id: dbConnectionDialog
         modal: true
-        dim: false
+        dim: true
         x: window.width / 2 - (width / 2)
         y: window.height / 2 - (height / 2)
+
+        onAccepted: database.connect(dbName, uri)
     }
 
+    // FAB to open the nav drawer
+    M.FloatingActionButton {
+        id: drawerFAB
+        iconSource: "icons/menu.png"
+        onClicked: drawer.visible = true
+        anchors {
+            bottom: parent.bottom
+            left: parent.left
+            bottomMargin: 8
+            leftMargin: 8
+        }
+    }
+
+    // Navigation drawer
     Drawer {
         id: drawer
-        width: 300
+        width: 400
         height: parent.height
+        dragMargin: 24
 
         ColumnLayout {
             anchors.fill: parent
             spacing: 0
 
-            Rectangle {
-                height: 48
+            // Database connection header
+            Item {
+                Layout.preferredHeight: 128
                 Layout.fillWidth: true
-                color: "transparent"
+
+                M.SystemIcon {
+                    source: "icons/database.png"
+                    state: database.connected ? "ActiveFocused" : "Inactive"
+                    anchors{
+                        left: parent.left
+                        leftMargin: 16
+                        verticalCenter: parent.verticalCenter
+                    }
+                }
+
+                Column {
+                    spacing: 0
+                    anchors {
+                        left: parent.left
+                        leftMargin: 72
+                        verticalCenter: parent.verticalCenter
+                    }
+
+                    Label {
+                        text: database.connected ? database.databaseName : "Disconnected"
+                        font.weight: Font.DemiBold
+                        font.pointSize: 16
+                        opacity: database.connected ? 0.87 : 0.54
+                    }
+
+                    Label {
+                        text: database.uri
+                        font.weight: Font.Normal
+                        opacity: 0.54
+                    }
+                }
+
+                Button {
+                    flat: true
+                    M.SystemIcon {
+                        source: "icons/dropdown.png"
+                        anchors.centerIn: parent
+                    }
+                    anchors {
+                        right: parent.right
+                        rightMargin: 16
+                        verticalCenter: parent.verticalCenter
+                    }
+                    onClicked: connectionMenu.open()
+
+                    Menu {
+                        id: connectionMenu
+                        MenuItem {
+                            text: "Connect..."
+                            onTriggered: dbConnectionDialog.open()
+                        }
+                        MenuItem {
+                            text: "Disconnect"
+                            onTriggered: database.disconnect()
+                        }
+                    }
+                }
             }
 
             M.Divider {Layout.fillWidth: true}
 
+            // Navigation items
             M.NavItem {
                 text: "Products"
                 iconSource: "../icons/product.png"
                 Layout.fillWidth: true
                 onClicked: contentStack.currentIndex = 0
-                state: contentStack.currentIndex === 0 ? "ActiveFocused" : "ActiveUnfocused"
+                state: database.connected ? contentStack.currentIndex === 0 ? "ActiveFocused" : "ActiveUnfocused" : "Inactive"
             }
 
             M.NavItem {
@@ -55,7 +136,7 @@ ApplicationWindow {
                 iconSource: "../icons/vendor.png"
                 Layout.fillWidth: true
                 onClicked: contentStack.currentIndex = 1
-                state: contentStack.currentIndex === 1 ? "ActiveFocused" : "ActiveUnfocused"
+                state: database.connected ? contentStack.currentIndex === 1 ? "ActiveFocused" : "ActiveUnfocused" : "Inactive"
             }
 
             M.NavItem {
@@ -63,16 +144,15 @@ ApplicationWindow {
                 iconSource: "../icons/operation.png"
                 Layout.fillWidth: true
                 onClicked: contentStack.currentIndex = 2
-                state: contentStack.currentIndex === 2 ? "ActiveFocused" : "ActiveUnfocused"
+                state: database.connected ? contentStack.currentIndex === 2 ? "ActiveFocused" : "ActiveUnfocused" : "Inactive"
             }
 
             M.NavItem {
                 text: "Database"
                 iconSource: "../icons/database.png"
                 Layout.fillWidth: true
-                state: contentStack.currentIndex === 3 ? "ActiveFocused" : "ActiveUnfocused"
-
                 onClicked: contentStack.currentIndex = 3
+                state: database.connected ? contentStack.currentIndex === 3 ? "ActiveFocused" : "ActiveUnfocused" : "Inactive"
             }
 
             Item {Layout.fillHeight: true}
@@ -80,44 +160,39 @@ ApplicationWindow {
 
     }
 
+    // Content
    StackLayout {
        id: contentStack
        anchors.fill: parent
-       onCurrentIndexChanged: drawer.visible = false
-
-       Item {}
+       currentIndex: 4
+       onCurrentIndexChanged: {
+           drawer.visible = false
+           var current = children[currentIndex]
+           if (!current.active) {
+               current.active = true
+           }
+       }
 
        Loader {
            focus: true
+           active: false
+           source: "ProductsView.qml"
+       }
+
+       Loader {
+           focus: true
+           active: false
            source: "VendorsView.qml"
        }
 
-       Item {}
+       Loader {}
 
        Loader {
-           id: databaseViewLoader
            focus: true
+           active: false
            source: "DatabaseView.qml"
        }
-   }
 
-   RoundButton {
-       id: drawerFAB
-       radius: 28
-       width: 56
-       height: 56
-       onClicked: drawer.visible = true
-       Material.elevation: 12
-       anchors {
-           bottom: parent.bottom
-           left: parent.left
-           bottomMargin: 8
-           leftMargin: 8
-       }
-
-       M.SystemIcon {
-           source: "icons/menu.png"
-           anchors.centerIn: parent
-       }
+       Item {}
    }
 }

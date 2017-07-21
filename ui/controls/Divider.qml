@@ -11,8 +11,10 @@ Rectangle {
     Component.onCompleted: {
         if (orientation === Qt.Horizontal) {
             height = 1
+            implicitHeight = 1
         } else {
             width = 1
+            implicitWidth = 1
         }
     }
 }

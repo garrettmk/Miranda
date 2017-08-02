@@ -37,9 +37,36 @@ BrowserView {
         }
     }
 
+    ProductValidatorDialog {
+        id: validateProductDialog
+    }
+
     CompareProductsDialog {
         id: compareProductsDialog
         model: selectionModel
+    }
+
+    Dialog {
+        id: confirmDeleteDialog
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        x: ApplicationWindow.window.width / 2 - width / 2
+        y: ApplicationWindow.window.height / 2 - height / 2
+
+        M.Label {
+            text: "Delete all " + selectionModel.length + " products?"
+        }
+
+        onAccepted: {
+            var idx
+            for (var i=0; i<selectionModel.length; i++) {
+                idx = root.model.matchObject(selectionModel.getObject(i))
+                root.model.removeRow(idx)
+            }
+
+            database.deleteModel(selectionModel)
+            selectionModel.clear()
+        }
     }
 
     // View body
@@ -47,13 +74,13 @@ BrowserView {
 
     cardDelegate: ProductCard {
         id: productCard
-        property Product product: index >= 0 ? root.model.getObject(index) : null
+        product: index >= 0 ? root.model.getObject(index) : null
         selected: selectionModel.contains(product)
         Material.theme: root.Material.theme
         Material.primary: Material.color(Material.Green, Material.Shade600)
         Material.accent: root.Material.accent
-
-        vendorName: database.getNameOfVendor(product)
+        vendorName: product !== null ? database.getNameOfVendor(product) || "(vendor n/a)" : "(vendor n/a)"
+        interactive: !ListView.view.moving
 
         actionMenu: Menu {
             MenuItem {
@@ -61,6 +88,14 @@ BrowserView {
                 onTriggered: {
                     editProductDialog.product = product
                     editProductDialog.open()
+                }
+            }
+
+            MenuItem {
+                text: "Validate"
+                onTriggered: {
+                    validateProductDialog.product = product
+                    validateProductDialog.open()
                 }
             }
 
@@ -92,55 +127,172 @@ BrowserView {
         }
     }
 
-    comparisonTool: M.ObjectTable {
-        id: selectionTable
-        title: model.length + " selected"
-        model: selectionModel
+    toolArea: ColumnLayout {
+        spacing: 48
 
-        columns: [
-            {name: "Title", property: "title", width: 200},
-            {name: "Brand", property: "brand", width: 100, alignment: Text.AlignLeft},
-            {name: "Model", property: "model", width: 100, alignment: Text.AlignLeft}
-        ]
-
-        headerTools: RowLayout {
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
             spacing: 0
 
-            M.IconToolButton {
-                enabled: selectionModel.length > 0
-                iconSource: "../icons/new_window.png"
-                onClicked: compareProductsDialog.open()
+            RowLayout {
+                Layout.fillWidth: true
+
+                M.SystemIcon {
+                    source: "icons/vendor.png"
+                    Layout.leftMargin: 24
+                }
+
+                ComboBox {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 24
+                }
+
+                M.IconToolButton {
+                    iconSource: "../icons/dots_vertical.png"
+                    Layout.leftMargin: 8
+
+                    Menu {
+                        id: matchedListingsMenu
+
+                        MenuItem {
+                            text: "Add..."
+                        }
+
+                        MenuItem {
+                            text: "Remove"
+                        }
+                    }
+                }
             }
 
-            M.IconToolButton {
-                iconSource: "../icons/dots_vertical.png"
-                enabled: selectionModel.length > 0
-                onClicked: selectionTableMenu.open()
+            M.Divider {
+                Layout.topMargin: 8
+                Layout.fillWidth: true
+                Layout.bottomMargin: 8
+            }
 
-                Menu {
-                    id: selectionTableMenu
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
 
-                    MenuItem {
-                        text: "Add tags..."
+                ColumnLayout {
+                    spacing: 0
+
+                    M.TextField {
+                        labelText: "List Price"
+                        text: "999.99"
+                        prefix: M.Label { text: "$"; opacity: 0.70 }
                     }
 
-                    MenuItem {
-                        text: "Remove tags..."
+                    M.TextField {
+                        labelText: "Mkt. Fees"
+                        text: "34.78"
+                        prefix: M.Label {text: "$-"; opacity: 0.70 }
                     }
 
-                    MenuSeparator {}
+                    M.TextField {
+                        labelText: "Est. COGS"
+                        text: "32.67"
+                        prefix: M.Label {text: "$-"; opacity: 0.70 }
+                    }
+                }
 
-                    MenuItem {
-                        text: "Delete..."
+                GridLayout {
+                    Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+                    Layout.leftMargin: 32
+                    columns: 3
+                    columnSpacing: 32
+                    rowSpacing: 8
+
+                    M.Label {
+                        type: "Caption"
+                        text: "Profit Each"
+                    }
+
+                    M.Label {
+                        type: "Caption"
+                        text: "Margin"
+                    }
+
+                    M.Label {
+                        type: "Caption"
+                        text: "ROI"
+                    }
+
+                    M.Label {
+                        type: "Display 2"
+                        text: "$22.34"
+                    }
+
+                    M.Label {
+                        type: "Display 2"
+                        text: "34%"
+                    }
+
+                    M.Label {
+                        type: "Display 2"
+                        text: "125%"
+                    }
+                }
+            }
+
+        }
+
+        M.ObjectTable {
+            id: selectionTable
+            title: model.length + " selected"
+            model: selectionModel
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            columns: [
+                {name: "Title", property: "title", width: 200},
+                {name: "Brand", property: "brand", width: 100, alignment: Text.AlignLeft},
+                {name: "Model", property: "model", width: 100, alignment: Text.AlignLeft}
+            ]
+
+            onRowClicked: {
+                var idx = root.model.matchObject(selectionModel.getObject(index))
+                cardListView.positionViewAtIndex(idx, ListView.Beginning)
+            }
+
+            headerTools: RowLayout {
+                spacing: 0
+
+                M.IconToolButton {
+                    enabled: selectionModel.length > 0
+                    iconSource: "../icons/new_window.png"
+                    onClicked: compareProductsDialog.open()
+                }
+
+                M.IconToolButton {
+                    iconSource: "../icons/dots_vertical.png"
+                    enabled: selectionModel.length > 0
+                    onClicked: selectionTableMenu.open()
+
+                    Menu {
+                        id: selectionTableMenu
+
+                        MenuItem {
+                            text: "Add tags..."
+                        }
+
+                        MenuItem {
+                            text: "Remove tags..."
+                        }
+
+                        MenuSeparator {}
+
+                        MenuItem {
+                            text: "Delete..."
+                            onTriggered: confirmDeleteDialog.open()
+                        }
                     }
                 }
             }
         }
 
-        onRowClicked: {
-            var idx = root.model.matchObject(selectionModel.getObject(index))
-            cardListView.positionViewAtIndex(idx, ListView.Beginning)
-        }
+
     }
 
     onNewItemClicked: {

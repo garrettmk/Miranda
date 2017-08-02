@@ -8,7 +8,7 @@ Image {
         height: 24
     }
 
-    state: "ActiveUnfocused"
+    state: enabled ? "ActiveUnfocused" : "Inactive"
     states: [
         State {
             name: "ActiveUnfocused"

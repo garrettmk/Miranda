@@ -39,7 +39,9 @@ BrowserView {
 
     ImportDialog {
         id: importDialog
-
+        Material.theme: parent.Material.theme
+        Material.primary: parent.Material.primary
+        Material.accent: parent.Material.accent
     }
 
     // View body
@@ -89,7 +91,7 @@ BrowserView {
     }
 
     // Comparison tool
-    comparisonTool: M.ObjectTable {
+    toolArea: M.ObjectTable {
         id: selectionTable
         title: "(" + model.length + ") selected:"
         model: selectionModel

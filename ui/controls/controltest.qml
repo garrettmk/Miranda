@@ -13,56 +13,53 @@ Q.ApplicationWindow {
 
     Material.theme: Material.Dark
 
+    ListModel {
+        id: tableModel
+
+        ListElement {
+            title: "Row One"
+            category: "Cat 1"
+            price: 15.99
+        }
+
+        ListElement {
+            title: "Row Two"
+            category: "Cat 21"
+            price: 16.99
+        }
+
+        ListElement {
+            title: "Row Three"
+            category: "Cat 3"
+            price: 17.99
+        }
+    }
+
     M.Card {
         id: labelCard
         anchors.centerIn: parent
-        contentWidth: labelGrid.implicitWidth + 48
-        contentHeight: labelGrid.implicitHeight + 48
+        contentWidth: table.implicitWidth + 48
+        contentHeight: table.implicitHeight + 48
 
-        MouseArea {
-            anchors.fill: parent
-            onClicked: labelCard.raised = !labelCard.raised
+        M.Table {
+            id: table
+            model: tableModel
+            implicitWidth: 500
+            implicitHeight: 500
 
-
-            GridLayout {
-                id: labelGrid
-                columns: 2
-                columnSpacing: 50
-                anchors.centerIn: parent
-
-                Q.Label {text: "Display 4"}
-                M.Label {type: "Display 4"; text: "Light 112"}
-
-                Q.Label {text: "Display 3"}
-                M.Label {type: "Display 3"; text: "Regular 56"}
-
-                Q.Label {text: "Display 2"}
-                M.Label {type: "Display 2"; text: "Regular 45"}
-
-                Q.Label {text: "Display 1"}
-                M.Label {type: "Display 1"; text: "Regular 34"}
-
-                Q.Label {text: "Headline"}
-                M.Label {type: "Headline"; text: "Regular 24"}
-
-                Q.Label {text: "Title"}
-                M.Label {type: "Title"; text: "Medium 20"}
-
-                Q.Label {text: "Subheading"}
-                M.Label {type: "Subheading"; text: "Regular 15"}
-
-                Q.Label {text: "Body 2"}
-                M.Label {type: "Body 2"; text: "Medium 13"}
-
-                Q.Label {text: "Body 1"}
-                M.Label {type: "Body 1"; text: "Regular 13"}
-
-                Q.Label {text: "Caption"}
-                M.Label {type: "Caption"; text: "Regular 12"}
-
-                Q.Label {text: "Button"}
-                M.Label {type: "Button"; text: "MEDIUM 14"}
+            M.TableColumn {
+                title: "Title"
+                role: "title"
+                columnWidth: 200
+                delegate: M.Label {text: columnData}
             }
+            M.TableColumn {
+                title: "Two"
+                role: "category"
+                columnWidth: 200
+                delegate: M.Label {text: columnData}
+            }
+
         }
     }
 }

@@ -4,123 +4,34 @@ import QtQuick.Controls.Material 2.1
 import QtQuick.Layouts 1.3
 import "controls" as M
 import Product 1.0
+import PriceValidator 1.0
+import QuantityValidator 1.0
+import RankValidator 1.0
 
 
 ObjectCard {
     id: card
 
+    property Product product
     property string vendorName
+    property alias interactive: mediaItemView.interactive
 
     mediaItem: Rectangle {
         color: Material.theme === Material.Light ? "white" : Material.color(Material.Grey, Material.Shade800)
         anchors.fill: parent
 
-        Rectangle {
-            id: tabDrawer
-            color: Qt.rgba(Material.primary.r, Material.primary.g, Material.primary.b, 0.5)
-            anchors {
-                right: parent.right
-                bottom: parent.bottom
-            }
-            height: mediaTabs.implicitHeight
-            width: height
-            z: 20
-
-            Behavior on width {
-                NumberAnimation {
-                    duration: 300
-                    easing.type: Easing.InOutCubic
-                }
-            }
-
-            state: drawerMouseArea.containsMouse || mediaTabs.hovered ? "Open" : "Closed"
-            states: [
-                State {
-                    name: "Closed"
-                    PropertyChanges {
-                        target: tabDrawer
-                        width: tabDrawer.height
-                    }
-                    PropertyChanges {
-                        target: drawerButton
-                        visible: true
-                    }
-                    PropertyChanges {
-                        target: mediaTabs
-                        visible: false
-                    }
-                },
-                State {
-                    name: "Open"
-                    PropertyChanges {
-                        target: tabDrawer
-                        width: tabDrawer.parent.width
-                    }
-                    PropertyChanges {
-                        target: drawerButton
-                        visible: false
-                    }
-                    PropertyChanges {
-                        target: mediaTabs
-                        visible: true
-                    }
-                }
-            ]
-
-            MouseArea {
-                id: drawerMouseArea
-                hoverEnabled: true
-                anchors.fill: parent
-            }
-
-            RowLayout {
-                anchors.fill: parent
-                spacing: 0
-
-                M.SystemIcon {
-                    id: drawerButton
-                    Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
-                    Layout.margins: 4
-                    source: "icons/arrow_left.png"
-                }
-
-                TabBar {
-                    id: mediaTabs
-                    background: Rectangle {color: "transparent"}
-                    Layout.fillWidth: true
-
-                    TabButton {
-                        text: "Image"
-                    }
-
-                    TabButton {
-                        text: "Details"
-                    }
-
-                    TabButton  {
-                        text: "Desc"
-                    }
-
-                    TabButton {
-                        text: "Matches"
-                    }
-                }
-            }
-        }
-
-        StackLayout {
+        SwipeView {
+            id: mediaItemView
             anchors.fill: parent
-            currentIndex: mediaTabs.currentIndex
-            onCurrentIndexChanged: if (currentIndex > 0) children[currentIndex].active = true
 
             M.ProductImage {
-                anchors.fill: parent
+                //anchors.fill: parent
                 source: imageUrl
             }
 
             Loader {
                 focus: true
-                active: false
+                active: active || SwipeView.isCurrentItem
                 sourceComponent: Item {
                     ColumnLayout {
                         spacing: 0
@@ -188,31 +99,31 @@ ObjectCard {
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: "Food Equipment Company"
+                                text: vendorName
                             }
 
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: sku
+                                text: sku !== undefined ? sku : "n/a"
                             }
 
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: category
+                                text: category !== undefined ? category : "n/a"
                             }
 
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: rank
+                                text: rank !== undefined ? rank.toLocaleString() : "n/a"
                             }
 
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: feedback
+                                text: feedback !== undefined ? feedback : "n/a"
                             }
 
                             // Column 2
@@ -254,31 +165,31 @@ ObjectCard {
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: brand
+                                text: brand !== undefined ? brand : "n/a"
                             }
 
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: model
+                                text: model !== undefined ? model : "n/a"
                             }
 
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: upc
+                                text: upc !== undefined ? upc : "n/a"
                             }
 
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: "$" + price.toLocaleString()
+                                text: price !== undefined ? "$" + price.toLocaleString() : "n/a"
                             }
 
                             M.Label {
                                 type: "Body 1"
                                 opacity: Material.theme === Material.Light ? 0.54 : 0.70
-                                text: quantity.toLocaleString()
+                                text: quantity !== undefined ? quantity.toLocaleString() : "n/a"
                             }
                         }
                     }
@@ -288,39 +199,85 @@ ObjectCard {
             // Description tab
             Loader {
                 focus: true
-                active: false
+                active: active || SwipeView.isCurrentItem
                 sourceComponent: Item {
-                    TextArea {
+                    id: descriptionItem
+                    state: "Locked"
+                    states: [
+                        State {
+                            name: "Locked"
+                            PropertyChanges {
+                                target: descFlickable
+                                interactive: false
+                                contentWidth: width
+                                contentHeight: height
+                                contentX: 0
+                                contentY: 0
+                            }
+                        },
+                        State {
+                            name: "Unlocked"
+                            PropertyChanges {
+                                target: descFlickable
+                                interactive: true
+                                contentWidth: descriptionText.contentWidth
+                                contentHeight: descriptionText.contentHeight
+                            }
+                        }
+                    ]
+                    Flickable {
+                        id: descFlickable
+                        interactive: false
                         anchors.fill: parent
-                        anchors.margins: 24
-                        readOnly: true
-                        text: description
+                        anchors.margins: 48
+                        rightMargin: 48
+
+                        Label {
+                            id: descriptionText
+                            anchors.fill: parent
+                            text: description !== undefined ? description : "n/a"
+                            elide: Text.ElideRight
+                            wrapMode: Text.Wrap
+                        }
+                    }
+                    M.IconToolButton {
+                        iconSource: descriptionItem.state === "Locked" ? "../icons/lock_closed.png" : "../icons/lock_open.png"
+                        onClicked: descriptionItem.state === "Locked" ? descriptionItem.state = "Unlocked" : descriptionItem.state = "Locked"
+                        anchors {
+                            bottom: parent.bottom
+                            right: parent.right
+                        }
+                    }
+
+                    Connections {
+                        target: card.ListView.view
+                        onMovingVerticallyChanged: if (card.ListView.view.movingVertically) descriptionItem.state = "Locked"
                     }
                 }
             }
+        }
 
-            // Matched Products
-            Loader {
-                focus: true
-                active: false
-                sourceComponent: Item {
-                    M.Label {
-                        anchors.centerIn: parent
-                        type: "Caption"
-                        text: "Not yet implemented. :("
-                    }
-                }
+        PageIndicator {
+            id: pageIndicator
+            count: mediaItemView.count
+            currentIndex: mediaItemView.currentIndex
+            opacity: mediaItemView.interactive
+            Behavior on opacity { OpacityAnimator { duration: 100 } }
+
+            anchors {
+                bottom: mediaItemView.bottom
+                horizontalCenter: mediaItemView.horizontalCenter
             }
 
-            // History
-            Loader {
-                focus: true
-                active: false
-                sourceComponent: Item {
-                    M.Label {
-                        anchors.centerIn: parent
-                        type: "Caption"
-                        text: "Not yet implemented. :("
+            delegate: Rectangle {
+                implicitWidth: 8
+                implicitHeight: 8
+                radius: 4
+                color: Material.primary
+                opacity: index === pageIndicator.currentIndex ? 0.95 : pressed ? 1.0 : 0.45
+                Behavior on opacity {
+                    OpacityAnimator {
+                        duration: 100
                     }
                 }
             }
@@ -340,7 +297,7 @@ ObjectCard {
                 type: "Headline"
                 textFormat: Text.StyledText
                 linkColor: Material.foreground
-                text: "<a href=\'" + detailPageUrl + "\'>" + title + "</a>"
+                text: title !== undefined ? detailPageUrl !== undefined ? "<a href=\'" + detailPageUrl + "\'>" + title + "</a>" : title : "n/a"
                 elide: Text.ElideRight
                 Layout.fillWidth: true
                 Layout.rightMargin: 56
@@ -350,7 +307,7 @@ ObjectCard {
 
             M.Label {
                 type: "Headline"
-                text: "$" + price.toLocaleString()
+                text: price !== undefined ? "$" + price.toLocaleString() : "n/a"
             }
         }
 
@@ -360,7 +317,7 @@ ObjectCard {
 
             M.Label {
                 type: "Body 1"
-                text: vendorName + ": " + sku
+                text: sku !== undefined ? vendorName + ": " + sku : vendorName + ": n/a"
                 opacity: Material.theme === Material.Light ? 0.54 : 0.7
                 elide: Text.ElideRight
                 Layout.fillWidth: true
@@ -369,46 +326,15 @@ ObjectCard {
 
             M.Label {
                 type: "Body 1"
-                text: "per " + quantity.toLocaleString()
+                text: quantity !== undefined ? "per " + quantity.toLocaleString() : "n/a"
             }
         }
 
         M.Label {
             type: "Body 1"
-            text: "Rank: " + rank.toLocaleString() + " in " + (category ? category : "Uncategorized")
+            text: "Rank: " + (rank !== undefined ? rank.toLocaleString() : "n/a") + " in " + (category !== undefined ? category : "Uncategorized")
             opacity: Material.theme === Material.Light ? 0.54 : 0.7
             elide: Text.ElideRight
-        }
-    }
-
-
-    actionItem: TabBar {
-        id: tabbar
-        enabled: dropdownState === "Down"
-        visible: enabled
-        opacity: enabled ? 1 : 0
-        background: Rectangle {color: "transparent"}
-
-        TabButton {
-            text: "Specs"
-        }
-
-        TabButton {
-            text: "Desc"
-        }
-
-        TabButton {
-            text: "Matches"
-        }
-
-        TabButton {
-            text: "History"
-        }
-    }
-
-    actionMenu: Menu {
-        MenuItem {
-            text: "Edit"
         }
     }
 }

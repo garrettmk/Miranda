@@ -94,7 +94,7 @@ Item {
             labelText: "Title"
             Layout.leftMargin: 32
             Layout.fillWidth: true
-            text: query.query.title
+            text: query.query.title !== undefined ? query.query.title : ""
             onEditingFinished: query.query.title = text
         }
 
@@ -110,7 +110,7 @@ Item {
 
             M.TextField {
                 labelText: "Brand"
-                text: query.query.brand
+                text: query.query.brand !== undefined ? query.query.brand : ""
                 onEditingFinished: query.query.brand = text
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
@@ -118,7 +118,7 @@ Item {
 
             M.TextField {
                 labelText: "Model"
-                text: query.query.model
+                text: query.query.model !== undefined ? query.query.model : ""
                 onEditingFinished: query.query.model = text
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
@@ -133,7 +133,7 @@ Item {
 
         M.TextField {
             labelText: "Category"
-            text: query.query.category
+            text: query.query.category !== undefined ? query.query.category : ""
             onEditingFinished: query.query.category = text
             Layout.fillWidth: true
             Layout.leftMargin: 32
@@ -147,7 +147,7 @@ Item {
 
             M.TextField {
                 labelText: "Min Rank"
-                text: query.query.minRank
+                text: query.query.minRank !== undefined ? query.query.minRank : ""
                 onEditingFinished: query.query.minRank = text
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
@@ -155,7 +155,7 @@ Item {
 
             M.TextField {
                 labelText: "Max Rank"
-                text: query.query.maxRank
+                text: query.query.maxRank !== undefined ? query.query.maxRank : ""
                 onEditingFinished: query.query.maxRank = text
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
@@ -163,7 +163,7 @@ Item {
 
             M.TextField {
                 labelText: "Feedback"
-                text: query.query.feedback
+                text: query.query.feedback !== undefined ? query.query.feedback : ""
                 onEditingFinished: query.query.feedback = text
                 Layout.fillWidth: true
                 Layout.leftMargin: 32

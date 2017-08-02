@@ -32,8 +32,8 @@ ObjectCard {
                 PropertyChanges {
                     target: mediaFlickable
                     interactive: true
-                    contentWidth: documentText.contentWidth
-                    contentHeight: documentText.contentHeight
+                    contentWidth: documentText.implicitWidth
+                    contentHeight: documentText.implicitHeight
                 }
             }
         ]

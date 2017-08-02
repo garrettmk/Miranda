@@ -15,7 +15,7 @@ Item {
 
     // Components provided by subclasses
     property Item queryBuilder
-    property Item comparisonTool
+    property Item toolArea
     property alias cardDelegate: cardList.delegate
 
     // Components exposed to users/subclasses
@@ -36,9 +36,9 @@ Item {
             queryBuilder.anchors.fill = queryBuilderHolder
         }
 
-        if (comparisonTool !== null) {
-            comparisonTool.parent = compToolHolder
-            comparisonTool.anchors.fill = compToolHolder
+        if (toolArea !== null) {
+            toolArea.parent = compToolHolder
+            toolArea.anchors.fill = compToolHolder
         }
 
         queryModel.insert(0, queryBuilder.query)
@@ -198,6 +198,9 @@ Item {
         spacing: 24
         displayMarginBeginning: 500
         displayMarginEnd: 500
+        snapMode: ListView.SnapToItem
+        flickDeceleration: 5000
+
         anchors {
             top: parent.top
             left: queryBuilderHolder.right

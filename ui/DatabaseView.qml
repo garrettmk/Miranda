@@ -49,7 +49,7 @@ BrowserView {
         }
     }
 
-    comparisonTool: M.ObjectTable {
+    toolArea: M.ObjectTable {
         id: selectionTable
         title: model.length + " selected"
         model: selectionModel

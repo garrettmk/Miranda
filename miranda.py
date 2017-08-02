@@ -1,23 +1,9 @@
-import sys, psutil, subprocess, sip
+import sys, psutil, subprocess, sip, pymongo
 import cupi as qp
 from models import *
 from queries import *
-from PyQt5 import QtGui
-
-
-########################################################################################################################
-
-
-class ClipboardAdapter(qtc.QObject):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._clipboard = QtGui.QClipboard()
-
-    @qtc.pyqtSlot(str)
-    def setText(self, text):
-        self._clipboard.setText(text, QtGui.QClipboard.Clipboard)
-        self._clipboard.setText(text, QtGui.QClipboard.Selection)
+from productvalidator import *
+from importhelper import FileImportHelper
 
 
 ########################################################################################################################
@@ -27,6 +13,15 @@ class MirandaDatabase(qp.MongoDatabase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.connectedChanged.connect(self._create_indices)
+
+    def _create_indices(self):
+        """Create any necessary indices in the database."""
+        products = self._get_collection(Product.__collection__)
+        products.create_index([('vendor.referent_id', pymongo.ASCENDING), ('sku', pymongo.ASCENDING)], unique=True)
+        products.create_index('category')
+        products.create_index('rank')
+
 
     def new_vendor_query(self):
         """Helper method for returning a basic Vendor query object."""
@@ -62,15 +57,26 @@ class MirandaDatabase(qp.MongoDatabase):
         doc = collection.find_one({'_id': product.vendor.referentId}, projection={'title': 1})
         return doc['title'] if doc is not None else ''
 
+    @qtc.pyqtSlot(result=QuantityValidator)
+    def newQuantityValidator(self):
+        """Helper method to return a QuantityValidatorData object."""
+        data = self.get_object(ObjectQuery(objectType='QuantityValidatorData'))
+        data = data if data is not None else QuantityValidatorData()
+        val = QuantityValidator(map=data)
+        sip.transferto(val, val)
+        return val
+
 
 ########################################################################################################################
 
 
 class MirandaApp(qp.App):
 
+    register_classes = [FileImportHelper,
+                        Validator]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self.db = MirandaDatabase()
 
     def prepare_root_context(self, context):
@@ -80,10 +86,6 @@ class MirandaApp(qp.App):
     @qtc.pyqtSlot(str)
     def setClipboardText(self, text):
         self.clipboard().setText(text)
-
-    @qtc.pyqtSlot(str, Vendor, list)
-    def importProducts(self, file, vendor, tags):
-        """Import """
 
 
 ########################################################################################################################

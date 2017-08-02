@@ -54,6 +54,9 @@ class ProductQueryDocument(qp.MongoQueryDocument):
     vendorChanged = qtc.pyqtSignal()
     vendor = qp.QueryReferenceProperty('vendor', notify=vendorChanged)
 
+    skuChanged = qtc.pyqtSignal()
+    sku = qp.QueryProperty('sku', 'equals', notify=skuChanged)
+
     titleChanged = qtc.pyqtSignal()
     title = qp.QueryProperty('title', 'regex', notify=titleChanged)
 

@@ -7,7 +7,7 @@ TextField {
     id: root
     hoverEnabled: true
     bottomPadding: 8
-    topPadding: 8 + 10 + 16
+    topPadding: labelText ? 8 + 10 + 16 : 16
 
     property Item prefix
     property Item suffix

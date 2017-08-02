@@ -9,7 +9,7 @@ Item {
     implicitWidth: flow.implicitWidth
     implicitHeight: flow.implicitHeight
 
-    property var model
+    property var model: []
     property bool readOnly: false
     property alias delegate: repeater.delegate
 

@@ -5,34 +5,38 @@ import QtQuick.Layouts 1.3
 import "controls" as M
 import ObjectModel 1.0
 import Product 1.0
+import ProfitRelationship 1.0
+//import QtCharts 2.2
 
 
-BrowserView {
+TableBrowserView {
     id: root
     title: "Products"
-    Material.primary: Material.color(Material.Green, Material.Shade700)
+
+    Material.primary: Material.color(Material.DeepPurple, Material.Shade500)
     Material.accent: Material.color(Material.Orange, Material.Shade500)
 
-    property ObjectModel selectionModel: ObjectModel {}
+    mainToolBarColor: Material.primary
+    sideToolBarColor: Material.color(Material.DeepPurple, Material.Shade800)
+    addNewButtonColor: Material.color(Material.DeepPurple, Material.ShadeA200)
 
-    // Dialogs
+    queryDialog.onlyShow: "Products"
+
+    Component.onCompleted: model = database.getModel(database.newProductQuery())
+
+    mainToolButtons: M.IconToolButton {
+        iconSource: "../icons/import.png"
+        onClicked: importDialog.open()
+    }
+
+    ImportDialog {
+        id: importDialog
+    }
+
     EditProductDialog {
         id: editProductDialog
-
         onAccepted: {
-            if (!root.model.contains(product)) {
-                root.model.insert(0, product)
-            }
-
             database.saveObject(product)
-            product = null
-        }
-
-        onRejected: {
-            if (!root.model.contains(product)) {
-                product.destroy()
-            }
-
             product = null
         }
     }
@@ -41,265 +45,400 @@ BrowserView {
         id: validateProductDialog
     }
 
-    CompareProductsDialog {
-        id: compareProductsDialog
-        model: selectionModel
-    }
-
-    Dialog {
+    M.CenteredModalDialog {
         id: confirmDeleteDialog
-        modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        x: ApplicationWindow.window.width / 2 - width / 2
-        y: ApplicationWindow.window.height / 2 - height / 2
+        title: "Confirm Delete"
+        standardButtons: Dialog.Yes | Dialog.No
 
         M.Label {
-            text: "Delete all " + selectionModel.length + " products?"
+            id: messageLabel
+            type: "Body 1"
+            text: "Are you sure you want to delete the selected products?"
         }
 
         onAccepted: {
-            var idx
-            for (var i=0; i<selectionModel.length; i++) {
-                idx = root.model.matchObject(selectionModel.getObject(i))
-                root.model.removeRow(idx)
+            var obj
+            var selected = table.selectedIndices
+            selected.sort(function(a, b) { return b - a }) // Sort descending
+            for (var i=0; i<selected.length; i++) {
+                obj = model.getObject(selected[i])
+                model.removeRow(selected[i])
+                database.deleteObject(obj)
+                obj.destroy()
             }
-
-            database.deleteModel(selectionModel)
-            selectionModel.clear()
+            table.selectedIndices = []
         }
     }
 
-    // View body
-    queryBuilder: ProductQueryBuilder {}
+    M.CenteredModalDialog {
+        id: groupEditTagsDialog
+        property bool adding: true
 
-    cardDelegate: ProductCard {
-        id: productCard
-        product: index >= 0 ? root.model.getObject(index) : null
-        selected: selectionModel.contains(product)
-        Material.theme: root.Material.theme
-        Material.primary: Material.color(Material.Green, Material.Shade600)
-        Material.accent: root.Material.accent
-        vendorName: product !== null ? database.getNameOfVendor(product) || "(vendor n/a)" : "(vendor n/a)"
-        interactive: !ListView.view.moving
+        title: adding ? "Add Tags" : "Remove Tags"
+        standardButtons: Dialog.Ok | Dialog.Cancel
 
-        actionMenu: Menu {
-            MenuItem {
-                text: "Edit"
-                onTriggered: {
-                    editProductDialog.product = product
-                    editProductDialog.open()
-                }
+        implicitWidth: 450
+        contentHeight: groupChipEditor.implicitHeight
+        padding: 24
+
+        RowLayout {
+            anchors.fill: parent
+            spacing: 32
+            M.SystemIcon {
+                source: "icons/tag.png"
             }
 
-            MenuItem {
-                text: "Validate"
-                onTriggered: {
-                    validateProductDialog.product = product
-                    validateProductDialog.open()
-                }
-            }
-
-            MenuItem {
-                text: "Copy SKU"
-                onTriggered: application.setClipboardText(sku)
-            }
-
-            MenuItem {
-                text: "Google product..."
-                onTriggered: Qt.openUrlExternally("http://googl.com/#q=" + brand.concat("+" + model).replace(" ", "+"))
-            }
-
-        }
-
-        onSelectButtonClicked: {
-            if (!selected) {
-                selectionModel.removeRow(selectionModel.matchObject(product))
-            } else {
-                selectionModel.append(product)
-            }
-            selected = Qt.binding(function() {return selectionModel.contains(product)})
-        }
-
-        property var conn: Connections {
-            target: selectionModel
-            onModelReset: productCard.selected = Qt.binding(function() {return selectionModel.contains(product)})
-            onRowsRemoved: productCard.selected = Qt.binding(function() {return selectionModel.contains(product)})
-        }
-    }
-
-    toolArea: ColumnLayout {
-        spacing: 48
-
-        ColumnLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 0
-
-            RowLayout {
+            M.ChipEditor {
+                id: groupChipEditor
                 Layout.fillWidth: true
-
-                M.SystemIcon {
-                    source: "icons/vendor.png"
-                    Layout.leftMargin: 24
-                }
-
-                ComboBox {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 24
-                }
-
-                M.IconToolButton {
-                    iconSource: "../icons/dots_vertical.png"
-                    Layout.leftMargin: 8
-
-                    Menu {
-                        id: matchedListingsMenu
-
-                        MenuItem {
-                            text: "Add..."
-                        }
-
-                        MenuItem {
-                            text: "Remove"
-                        }
-                    }
-                }
-            }
-
-            M.Divider {
-                Layout.topMargin: 8
-                Layout.fillWidth: true
-                Layout.bottomMargin: 8
-            }
-
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-
-                ColumnLayout {
-                    spacing: 0
-
-                    M.TextField {
-                        labelText: "List Price"
-                        text: "999.99"
-                        prefix: M.Label { text: "$"; opacity: 0.70 }
-                    }
-
-                    M.TextField {
-                        labelText: "Mkt. Fees"
-                        text: "34.78"
-                        prefix: M.Label {text: "$-"; opacity: 0.70 }
-                    }
-
-                    M.TextField {
-                        labelText: "Est. COGS"
-                        text: "32.67"
-                        prefix: M.Label {text: "$-"; opacity: 0.70 }
-                    }
-                }
-
-                GridLayout {
-                    Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                    Layout.leftMargin: 32
-                    columns: 3
-                    columnSpacing: 32
-                    rowSpacing: 8
-
-                    M.Label {
-                        type: "Caption"
-                        text: "Profit Each"
-                    }
-
-                    M.Label {
-                        type: "Caption"
-                        text: "Margin"
-                    }
-
-                    M.Label {
-                        type: "Caption"
-                        text: "ROI"
-                    }
-
-                    M.Label {
-                        type: "Display 2"
-                        text: "$22.34"
-                    }
-
-                    M.Label {
-                        type: "Display 2"
-                        text: "34%"
-                    }
-
-                    M.Label {
-                        type: "Display 2"
-                        text: "125%"
-                    }
-                }
-            }
-
-        }
-
-        M.ObjectTable {
-            id: selectionTable
-            title: model.length + " selected"
-            model: selectionModel
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            columns: [
-                {name: "Title", property: "title", width: 200},
-                {name: "Brand", property: "brand", width: 100, alignment: Text.AlignLeft},
-                {name: "Model", property: "model", width: 100, alignment: Text.AlignLeft}
-            ]
-
-            onRowClicked: {
-                var idx = root.model.matchObject(selectionModel.getObject(index))
-                cardListView.positionViewAtIndex(idx, ListView.Beginning)
-            }
-
-            headerTools: RowLayout {
-                spacing: 0
-
-                M.IconToolButton {
-                    enabled: selectionModel.length > 0
-                    iconSource: "../icons/new_window.png"
-                    onClicked: compareProductsDialog.open()
-                }
-
-                M.IconToolButton {
-                    iconSource: "../icons/dots_vertical.png"
-                    enabled: selectionModel.length > 0
-                    onClicked: selectionTableMenu.open()
-
-                    Menu {
-                        id: selectionTableMenu
-
-                        MenuItem {
-                            text: "Add tags..."
-                        }
-
-                        MenuItem {
-                            text: "Remove tags..."
-                        }
-
-                        MenuSeparator {}
-
-                        MenuItem {
-                            text: "Delete..."
-                            onTriggered: confirmDeleteDialog.open()
-                        }
-                    }
-                }
             }
         }
 
+        onAccepted: {
+            var obj
+            var selected = table.selectedIndices
+            for (var i=0; i<selected.length; i++) {
+                obj = model.getObject(selected[i])
+                if (adding)
+                    obj.addTags(groupChipEditor.model)
+                else
+                    obj.removeTags(groupChipEditor.model)
+
+                database.saveObject(obj)
+            }
+            groupChipEditor.clear()
+        }
 
     }
 
-    onNewItemClicked: {
+    onAddNewButtonClicked: {
         var prod = Qt.createQmlObject("import QtQuick 2.7; import Product 1.0; Product {}", editProductDialog)
         editProductDialog.product = prod
         editProductDialog.open()
     }
 
+    columns: [
+        {name: "Vendor", width: 225},
+        {name: "SKU", width: 150},
+        {name: "Brand", width: 150},
+        {name: "Model", width: 125},
+        {name: "Rank", width: 75, alignment: Qt.AlignRight},
+        {name: "Category", width: 200}
+    ]
 
+    actionOnSelectedMenu: Menu {
+        MenuItem {
+            text: "Add tags..."
+            onTriggered: { groupEditTagsDialog.adding = true; groupEditTagsDialog.open() }
+        }
+        MenuItem {
+            text: "Remove tags..."
+            onTriggered: { groupEditTagsDialog.adding = false; groupEditTagsDialog.open() }
+        }
+        MenuItem {
+            text: "Delete..."
+            onTriggered: confirmDeleteDialog.open()
+        }
+    }
+
+    tableRowDelegate: M.TableRow {
+        onClicked: { table.currentIndex = index; table.focus = true }
+
+        M.Label {
+            type: "Body 1"
+            text: database.getVendorName(vendor) || "n/a"
+            elide: Text.ElideRight
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: sku !== undefined ? sku : "n/a"
+            elide: Text.ElideRight
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: brand !== undefined ? brand : "n/a"
+            elide: Text.ElideRight
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: model !== undefined ? model : "n/a"
+            elide: Text.ElideRight
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: rank !== undefined ? rank.toLocaleString() : "n/a"
+            elide: Text.ElideLeft
+            horizontalAlignment: Text.AlignRight
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: category !== undefined ? category : "n/a"
+            elide: Text.ElideRight
+        }
+    }
+
+    sideToolBar: Item {
+        Row {
+            id: sideToolsRow
+            spacing: 8
+            anchors {
+                top: parent.top
+                right: parent.right
+                margins: 8
+            }
+
+            M.IconToolButton {
+                iconSource: "../icons/edit.png"
+                enabled: root.currentObject !== null
+                onClicked: {
+                    editProductDialog.product = root.currentObject
+                    editProductDialog.open()
+                }
+            }
+
+            M.IconToolButton {
+                iconSource: "../icons/double_check.png"
+                enabled: root.currentObject !== null
+                onClicked: {
+                    validateProductDialog.product = root.currentObject
+                    validateProductDialog.open()
+                }
+            }
+        }
+
+
+        M.Label {
+            anchors {
+                top: sideToolsRow.bottom
+                topMargin: 0
+                margins: 24
+                left: parent.left
+                right:parent.right
+                bottom: parent.bottom
+            }
+
+            type: "Title"
+            opacity: Material.theme === Material.Light ? 0.54 : 0.70
+            text: root.currentObject !== null ? root.currentObject.title !== undefined ? root.currentObject.title : "n/a" : ""
+            verticalAlignment: Text.AlignBottom
+            wrapMode: Text.Wrap
+            elide: Text.ElideRight
+        }
+    }
+
+    sidePanel: Flickable {
+        id: panel
+        clip: true
+        anchors.fill: parent
+        contentWidth: width
+        contentHeight: panelLayout.implicitHeight
+
+        ColumnLayout {
+            id: panelLayout
+            width: parent.width
+            enabled: root.currentObject !== null
+            spacing: 0
+
+            M.ProductImage {
+                source: enabled ? root.currentObject.imageUrl : ""
+                Layout.fillWidth: true
+                Layout.preferredHeight: width / (16/9)
+            }
+
+            M.ChipEditor {
+                id: chipEditor
+                readOnly: true
+                model: enabled ? root.currentObject.tags : []
+                Layout.fillWidth: true
+                Layout.margins: 24
+            }
+
+            M.Divider { Layout.fillWidth: true }
+
+            GridLayout {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.margins: 24
+                rows: 5
+                flow: GridLayout.TopToBottom
+                columnSpacing: 32
+                rowSpacing: 8
+
+                // Column 1
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "Vendor:"
+                }
+
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "SKU:"
+                }
+
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "Category:"
+                }
+
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "Rank:"
+                }
+
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "Feedback:"
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? database.getVendorName(root.currentObject.vendor) : ""
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.sku : ""
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.category !== undefined ? root.currentObject.category : "n/a" : ""
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.rank !== undefined ? root.currentObject.rank.toLocaleString() : "n/a" : ""
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.feedback !== undefined ? (root.currentObject.feedback * 100).toFixed() + "%" : "n/a" : ""
+                }
+
+                // Column 2
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "Brand:"
+                }
+
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "Model:"
+                }
+
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "UPC:"
+                }
+
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "Price:"
+                }
+
+                M.Label {
+                    type: "Body 2"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    Layout.alignment: Qt.AlignRight
+                    text: "Quantity:"
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.brand !== undefined ? root.currentObject.brand : "n/a" : ""
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.model !== undefined ? root.currentObject.model : "n/a" : ""
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.upc !== undefined ? root.currentObject.upc : "n/a" : ""
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.price !== undefined ? "$" + root.currentObject.price.toFixed(2) : "n/a" : ""
+                }
+
+                M.Label {
+                    type: "Body 1"
+                    opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                    text: enabled ? root.currentObject.quantity !== undefined ? root.currentObject.quantity.toLocaleString() : "n/a" : ""
+                }
+            }
+
+            M.Label {
+                Layout.margins: 24
+                Layout.fillWidth: true
+                Layout.preferredHeight: implicitHeight
+                text: enabled ? root.currentObject.description !== undefined ? root.currentObject.description : "n/a" : ""
+                wrapMode: Text.Wrap
+            }
+
+            M.Divider {
+                Layout.topMargin: 24
+                Layout.fillWidth: true
+            }
+
+//            ChartView {
+//                id: chart
+//                title: "Test Chart"
+//                Layout.fillWidth: true
+//                Layout.preferredHeight: width / (16/9)
+//                legend.alignment: Qt.AlignBottom
+//                antialiasing: true
+
+//                property var model: [
+//                    { x: 0, y: 0 },
+//                    { x: 1.1, y: 3.2 },
+//                    { x: 1.9, y: 2.4 },
+//                    { x: 2.1, y: 2.1 },
+//                    { x: 2.9, y: 2.9 }
+//                ]
+
+//                Component.onCompleted: {
+//                    model.forEach( function (x) {series.append(x.x, x.y)} )
+//                }
+
+//                SplineSeries {
+//                        id: series
+
+//                }
+//            }
+        }
+    }
 }

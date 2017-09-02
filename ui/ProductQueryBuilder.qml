@@ -3,36 +3,121 @@ import QtQuick.Controls 2.1
 import QtQuick.Controls.Material 2.1
 import QtQuick.Layouts 1.3
 import "controls" as M
-import ObjectQuery 1.0
-import ProductQueryDocument 1.0
-import ProductSortDocument 1.0
-import QueryQueryDocument 1.0
 
 
 Item {
-    id: builder
+    id: root
+    implicitWidth: layout.implicitWidth
+    implicitHeight: layout.implicitHeight
 
-    property ObjectQuery query: ObjectQuery {
-        name: "All products"
-        objectType: "Product"
-        query: ProductQueryDocument {}
-        sort: ProductSortDocument {}
-    }
+    function show(query) {
+        if (query === null) {
+            textSearchField.text = ""
+            vendorBox.currentVendor = null
+            titleField.text = ""
+            brandField.text = ""
+            modelField.text = ""
+            categoryField.text = ""
+            minRankField.text = ""
+            maxRankField.text = ""
+            feedbackField.text = ""
+            sortFieldBox.currentIndex = 0
+        } else {
+            textSearchField.text = query.query.textSearch !== undefined ? query.query.textSearch : ""
+            vendorBox.currentVendor = query.query.vendor
+            titleField.text = query.query.title !== undefined ? query.query.title : ""
+            brandField.text = query.query.brand !== undefined ? query.query.brand : ""
+            modelField.text = query.query.model !== undefined ? query.query.model : ""
+            categoryField.text = query.query.category !== undefined ? query.query.category : ""
+            minRankField.text = query.query.minRank !== undefined ? query.query.minRank : ""
+            maxRankField.text = query.query.maxRank !== undefined ? query.query.maxRank : ""
+            feedbackField.text = query.query.feedback !== undefined ? query.query.feedback : ""
 
-    property ObjectQuery queryQuery: ObjectQuery {
-        objectType: "ObjectQuery"
-        query: QueryQueryDocument {
-            objectType: "Product"
+            if (query.sort.title !== undefined) {
+                sortFieldBox.currentIndex = 1
+                sortOrderBox.currentIndex = query.sort.title
+                return
+            }
+
+            if (query.sort.brand !== undefined) {
+                sortFieldBox.currentIndex = 2
+                sortOrderBox.currentIndex = query.sort.brand
+                return
+            }
+
+            if (query.sort.model !== undefined) {
+                sortFieldBox.currentIndex = 3
+                sortOrderBox.currentIndex = query.sort.model
+                return
+            }
+
+            if (query.sort.category !== undefined) {
+                sortFieldBox.currentIndex = 4
+                sortOrderBox.currentIndex = query.sort.category
+                return
+            }
+
+            if (query.sort.rank !== undefined) {
+                sortFieldBox.currentIndex = 5
+                sortOrderBox.currentIndex = query.sort.rank
+                return
+            }
+
+            if (query.sort.feedback !== undefined) {
+                sortFieldBox.currentIndex = 6
+                sortOrderBox.currentIndex = query.sort.feedback
+                return
+            }
+
+            sortFieldBox.currentIndex = 0
         }
     }
 
-    function newQuery() {
-        query = database.newProductQuery()
+    function applyTo(query) {
+        if (query !== null) {
+            query.query.textSearch = textSearchField.text ? textSearchField.text : undefined
+            query.query.vendor = vendorBox.currentIndex ? vendorBox.currentVendor : undefined
+            query.query.title = titleField.text ? titleField.text : undefined
+            query.query.brand = brandField.text ? brandField.text : undefined
+            query.query.model = modelField.text ? modelField.text : undefined
+            query.query.category = categoryField.text ? categoryField.text : undefined
+            query.query.minRank = minRankField.text ? parseInt(minRankField.text) : undefined
+            query.query.maxRank = maxRankField.text ? parseInt(maxRankField.text) : undefined
+            query.query.feedback = feedbackField.text ? parseFloat(feedbackField.text) : undefined
+
+            _clear_sorts(query)
+            var sortIdx = sortFieldBox.currentIndex
+            var sortDir = sortOrderBox.currentIndex
+
+            if (sortIdx === 1)
+                query.sort.title = sortDir
+            else if (sortIdx === 2)
+                query.sort.brand = sortDir
+            else if (sortIdx === 3)
+                query.sort.model = sortDir
+            else if (sortIdx === 4)
+                query.sort.category = sortDir
+            else if (sortIdx === 5)
+                query.sort.rank = sortDir
+            else if (sortIdx === 6)
+                query.sort.feedback = sortDir
+        }
     }
 
+    function _clear_sorts(query) {
+        query.sort.title = undefined
+        query.sort.brand = undefined
+        query.sort.model = undefined
+        query.sort.category = undefined
+        query.sort.rank = undefined
+        query.sort.feedback = undefined
+    }
+
+    // Body
     GridLayout {
+        id: layout
         columns: 2
-        columnSpacing: 0
+        columnSpacing: 32
         rowSpacing: 0
         anchors {
             top: parent.top
@@ -41,67 +126,47 @@ Item {
         }
 
         M.Label {
-            type: "Subheading"
-            text: "Query Properties"
-            opacity: Material.theme === Material.Light ? 0.54 : 0.70
+            type: "Subheading Light"
+            text: "Query Parameters"
             Layout.columnSpan: 2
         }
 
         M.SystemIcon {
-            source: "icons/save.png"
-            Layout.alignment: Qt.AlignBottom
-            Layout.bottomMargin: 4
+            source: "icons/text.png"
+            Layout.topMargin: 30
         }
 
         M.TextField {
-            labelText: "Query name"
-            Layout.leftMargin: 32
+            id: textSearchField
             Layout.fillWidth: true
-            text: query.name
-            onEditingFinished: query.name = text
-        }
-
-        M.Label {
-            type: "Subheading"
-            text: "Query Parameters"
-            opacity: Material.theme === Material.Light ? 0.54 : 0.70
-            Layout.columnSpan: 2
-            Layout.topMargin: 48
+            labelText: "Text Search"
         }
 
         M.SystemIcon {
             source: "icons/vendor.png"
-            Layout.alignment: Qt.AlignTop
             Layout.topMargin: 30
         }
 
         VendorComboBox {
             id: vendorBox
             Layout.fillWidth: true
-            Layout.leftMargin: 32
-            Layout.topMargin: 16
-            currentVendor: query.query.vendor
-            onActivated: query.query.vendor = currentVendor
+            Layout.topMargin: 24
         }
 
         M.SystemIcon {
             source: "icons/title.png"
-            Layout.alignment: Qt.AlignBottom
-            Layout.bottomMargin: 4
+            Layout.topMargin: 30
         }
 
         M.TextField {
+            id: titleField
             labelText: "Title"
-            Layout.leftMargin: 32
             Layout.fillWidth: true
-            text: query.query.title !== undefined ? query.query.title : ""
-            onEditingFinished: query.query.title = text
         }
 
         M.SystemIcon {
             source: "icons/features.png"
-            Layout.alignment: Qt.AlignBottom
-            Layout.bottomMargin: 4
+            Layout.topMargin: 30
         }
 
         RowLayout {
@@ -109,17 +174,14 @@ Item {
             spacing: 0
 
             M.TextField {
+                id: brandField
                 labelText: "Brand"
-                text: query.query.brand !== undefined ? query.query.brand : ""
-                onEditingFinished: query.query.brand = text
                 Layout.fillWidth: true
-                Layout.leftMargin: 32
             }
 
             M.TextField {
+                id: modelField
                 labelText: "Model"
-                text: query.query.model !== undefined ? query.query.model : ""
-                onEditingFinished: query.query.model = text
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
             }
@@ -127,16 +189,24 @@ Item {
 
         M.SystemIcon {
             source: "icons/feedback.png"
-            Layout.alignment: Qt.AlignBottom
-            Layout.bottomMargin: 4
+            Layout.topMargin: 32
         }
 
         M.TextField {
+            id: categoryField
             labelText: "Category"
-            text: query.query.category !== undefined ? query.query.category : ""
-            onEditingFinished: query.query.category = text
             Layout.fillWidth: true
-            Layout.leftMargin: 32
+        }
+
+        M.SystemIcon {
+            source: "icons/tag.png"
+            Layout.topMargin: 30
+        }
+
+        M.ChipEditor {
+            id: tagsEditor
+            Layout.topMargin: 30
+            Layout.fillWidth: true
         }
 
         Item {Layout.preferredWidth: 1}
@@ -146,83 +216,47 @@ Item {
             spacing: 0
 
             M.TextField {
+                id: minRankField
                 labelText: "Min Rank"
-                text: query.query.minRank !== undefined ? query.query.minRank : ""
-                onEditingFinished: query.query.minRank = text
                 Layout.fillWidth: true
-                Layout.leftMargin: 32
             }
 
             M.TextField {
+                id: maxRankField
                 labelText: "Max Rank"
-                text: query.query.maxRank !== undefined ? query.query.maxRank : ""
-                onEditingFinished: query.query.maxRank = text
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
             }
 
             M.TextField {
+                id: feedbackField
                 labelText: "Feedback"
-                text: query.query.feedback !== undefined ? query.query.feedback : ""
-                onEditingFinished: query.query.feedback = text
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
             }
         }
 
         M.Label {
-            type: "Subheading"
+            type: "Subheading Light"
             text: "Sort Options"
-            opacity: Material.theme === Material.Light ? 0.54 : 0.70
             Layout.columnSpan: 2
             Layout.topMargin: 48
         }
 
+        M.SystemIcon {
+            source: "icons/sort.png"
+            Layout.topMargin: 30
+        }
+
         RowLayout {
-            Layout.columnSpan: 2
             Layout.fillWidth: true
             Layout.topMargin: 24
             spacing: 0
-
-            M.SystemIcon {
-                source: "icons/sort.png"
-                Layout.alignment: Qt.AlignBottom
-                Layout.bottomMargin: 8
-            }
 
             ComboBox {
                 id: sortFieldBox
                 model: ["None", "Title", "Brand", "Model", "Category", "Rank", "Feedback"]
                 Layout.fillWidth: true
-                Layout.leftMargin: 32
-                currentIndex: query.sort.title !== undefined ? 1 : query.sort.brand !== undefined ? 2 : query.sort.model !== undefined ? 3 : query.sort.category !== undefined ? 4 : query.sort.rank !== undefined ? 5 : query.sort.feedback !== undefined ? 6 : 0
-                onActivated: {
-                    clearFilters()
-                    var order = sortOrderBox.currentIndex
-
-                    if (currentIndex === 1) {
-                        query.sort.title = order
-                    } else if (currentIndex === 2) {
-                        query.sort.brand = order
-                    } else if (currentIndex === 3) {
-                        query.sort.model = order
-                    } else if (currentIndex === 4) {
-                        query.sort.category = order
-                    } else if (currentIndex === 5) {
-                        query.sort.rank = order
-                    } else if (currentIndex === 6) {
-                        query.sort.feedback = order
-                    }
-                }
-
-                function clearFilters() {
-                    query.sort.title = null
-                    query.sort.brand = null
-                    query.sort.model = null
-                    query.sort.category = null
-                    query.sort.rank = null
-                    query.sort.feedback = null
-                }
             }
 
             ComboBox {
@@ -231,13 +265,7 @@ Item {
                 model: ["Ascending", "Descending"]
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
-                onActivated: {
-                    if (sortFieldBox.currentIndex === 0) {
-                        query.sort.title = currentIndex
-                    } else {
-                        query.sort.website = currentIndex
-                    }
-                }
+
             }
         }
     }

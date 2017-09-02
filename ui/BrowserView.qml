@@ -12,6 +12,7 @@ Item {
 
     // Properties
     property alias title: titleLabel.text
+    property var currentItem: cardList.currentIndex > -1 ? model.getObject(cardList.currentIndex) : null
 
     // Components provided by subclasses
     property Item queryBuilder
@@ -111,7 +112,10 @@ Item {
             M.IconToolButton {
                 id: searchButton
                 iconSource: "../icons/search.png"
-                onClicked: model = database.getModel(queryBuilder.query)
+                onClicked: {
+                    cardList.currentIndex = -1
+                    model = database.getModel(queryBuilder.query)
+                }
             }
 
             M.IconToolButton {
@@ -200,6 +204,7 @@ Item {
         displayMarginEnd: 500
         snapMode: ListView.SnapToItem
         flickDeceleration: 5000
+        highlightRangeMode: ListView.StrictlyEnforceRange
 
         anchors {
             top: parent.top

@@ -3,39 +3,59 @@ import QtQuick.Controls 2.1
 import QtQuick.Controls.Material 2.1
 import QtQuick.Layouts 1.3
 import "controls" as M
-import ObjectQuery 1.0
-import VendorQueryDocument 1.0
-import VendorSortDocument 1.0
-import QueryQueryDocument 1.0
 
 
 Item {
-    id: builder
+    id: root
+    implicitWidth: layout.implicitWidth
+    implicitHeight: layout.implicitHeight
 
-    property ObjectQuery query: ObjectQuery {
-        name: "All vendors"
-        objectType: "Vendor"
-        query: VendorQueryDocument {}
-        sort: VendorSortDocument {
-            title: Qt.AscendingOrder
+    function show(query) {
+        if (query === null) {
+            titleField.text = ""
+            websiteField.text = ""
+            sortFieldBox.currentIndex = 0
+        } else {
+            titleField.text = query.query.title !== undefined ? query.query.title : ""
+            websiteField.text = query.query.website !== undefined ? query.query.website : ""
+
+            if (query.sort.title !== undefined) {
+                sortFieldBox.currentIndex = 1
+                sortOrderBox.currentIndex = query.sort.title
+            } else if (query.sort.website !== undefined) {
+                sortFieldBox.currentIndex = 2
+                sortOrderBox.currentIndex = query.sort.website
+            } else {
+                sortFieldBox.currentIndex = 0
+            }
         }
     }
 
-    property ObjectQuery queryQuery: ObjectQuery {
-        objectType: "ObjectQuery"
-        query: QueryQueryDocument {
-            objectType: "Vendor"
+    function applyTo (query) {
+        if (query !== null) {
+            query.query.title = titleField.text ? titleField.text : undefined
+            query.query.website = websiteField.text ? websiteField.text : undefined
+
+            _clear_sorts(query)
+            var sortIdx = sortFieldBox.currentIndex
+            var sortDir = sortOrderBox.currentIndex
+
+            if (sortIdx === 1)
+                query.sort.title = sortDir
+            else if (sortIdx === 2)
+                query.sort.website = sortDir
         }
     }
 
-    function newQuery() {
-        query = Qt.createQmlObject("import QtQuick 2.7; import ObjectQuery 1.0; import VendorQueryDocument 1.0; \
-                                          ObjectQuery {objectType: \"Vendor\"; query: VendorQueryDocument {} }", builder)
+    function _clear_sorts(query) {
+        query.sort.title = undefined
+        query.sort.website = undefined
     }
 
     GridLayout {
+        id: layout
         columns: 2
-        columnSpacing: 0
+        columnSpacing: 32
         rowSpacing: 0
         anchors {
             top: parent.top
@@ -45,59 +65,31 @@ Item {
 
         M.Label {
             type: "Subheading"
-            opacity: Material.theme === Material.Light ? 0.54 : 0.70
-            text: "Query Properties"
-            Layout.columnSpan: 2
-        }
-
-        M.SystemIcon {
-            source: "icons/save.png"
-            Layout.alignment: Qt.AlignBottom
-            Layout.bottomMargin: 4
-        }
-
-        M.TextField {
-            labelText: "Query name"
-            Layout.leftMargin: 32
-            Layout.fillWidth: true
-            text: query.name
-            onEditingFinished: query.name = text
-        }
-
-        M.Label {
-            type: "Subheading"
             text: "Query Parameters"
             opacity: Material.theme === Material.Light ? 0.54 : 0.70
             Layout.columnSpan: 2
-            Layout.topMargin: 48
         }
 
         M.SystemIcon {
             source: "icons/title.png"
-            Layout.alignment: Qt.AlignBottom
-            Layout.bottomMargin: 4
+            Layout.topMargin: 30
         }
 
         M.TextField {
+            id: titleField
             labelText: "Title"
-            Layout.leftMargin: 32
             Layout.fillWidth: true
-            text: query.query.title
-            onEditingFinished: query.query.title = text
         }
 
         M.SystemIcon {
             source: "icons/web.png"
-            Layout.alignment: Qt.AlignBottom
-            Layout.bottomMargin: 4
+            Layout.topMargin: 30
         }
 
         M.TextField {
+            id: websiteField
             labelText: "Website"
-            Layout.leftMargin: 32
             Layout.fillWidth: true
-            text: query.query.website
-            onEditingFinished: query.query.website = text
         }
 
         M.Label {
@@ -108,36 +100,21 @@ Item {
             Layout.topMargin: 48
         }
 
+        M.SystemIcon {
+            source: "icons/sort.png"
+            Layout.topMargin: 30
+        }
+
         RowLayout {
-            Layout.columnSpan: 2
             Layout.fillWidth: true
             Layout.topMargin: 24
             spacing: 0
 
-            M.SystemIcon {
-                source: "icons/sort.png"
-                Layout.alignment: Qt.AlignBottom
-                Layout.bottomMargin: 8
-            }
 
             ComboBox {
                 id: sortFieldBox
                 model: ["None", "Title", "Website"]
                 Layout.fillWidth: true
-                Layout.leftMargin: 32
-                currentIndex: query.sort.title === undefined && query.sort.website === undefined ? 0 : query.website === undefined ? 1 : 2
-                onActivated: {
-                    if (currentIndex === 0) {
-                        query.sort.title = null
-                        query.sort.website = null
-                    } else if (currentIndex === 1) {
-                        query.sort.website = null
-                        query.sort.title = sortOrderBox.currentIndex
-                    } else {
-                        query.sort.title = null
-                        query.sort.website = sortOrderBox.currentIndex
-                    }
-                }
             }
 
             ComboBox {
@@ -146,13 +123,7 @@ Item {
                 model: ["Ascending", "Descending"]
                 Layout.fillWidth: true
                 Layout.leftMargin: 32
-                onActivated: {
-                    if (sortFieldBox.currentIndex === 0) {
-                        query.sort.title = currentIndex
-                    } else {
-                        query.sort.website = currentIndex
-                    }
-                }
+
             }
         }
     }

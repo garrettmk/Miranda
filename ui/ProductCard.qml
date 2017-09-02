@@ -12,7 +12,6 @@ import RankValidator 1.0
 ObjectCard {
     id: card
 
-    property Product product
     property string vendorName
     property alias interactive: mediaItemView.interactive
 
@@ -25,7 +24,6 @@ ObjectCard {
             anchors.fill: parent
 
             M.ProductImage {
-                //anchors.fill: parent
                 source: imageUrl
             }
 
@@ -307,7 +305,7 @@ ObjectCard {
 
             M.Label {
                 type: "Headline"
-                text: price !== undefined ? "$" + price.toLocaleString() : "n/a"
+                text: price !== undefined ? "$" + price.toFixed(2) : "n/a"
             }
         }
 

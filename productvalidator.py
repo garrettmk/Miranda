@@ -1,7 +1,7 @@
 import re
 import cupi as qp
 from PyQt5 import QtCore, QtQml
-from models import Product
+from models import Product, QuantityValidatorData
 
 
 ########################################################################################################################
@@ -253,6 +253,7 @@ class QuantityValidator(Validator):
             return False
 
     def make_guess(self, value):
+        guess_map = self._map.map if isinstance(self._map, QuantityValidatorData) else self._map
 
         # Try to coerce it to int first
         try:
@@ -260,30 +261,48 @@ class QuantityValidator(Validator):
         except (ValueError, TypeError):
             pass
 
-        # All the next tests depend on it being a string, so get it ready
-        try:
-            value = str(value).lower().strip().replace(',', '')
-        except ValueError:
-            return None
-
         # Check if we've already come across this phrase before
         try:
-            return self._map[value]
-        except KeyError:
+            value = str(value).lower().strip().replace(',', '')
+            return guess_map[value]
+        except (KeyError, ValueError):
             pass
 
         # Check the title
         title = self.product.title.lower()
-        for key, value in self._map.items():
+        for key, value in guess_map.items():
             if key in title:
                 return value
 
-        return None
+        # Check the product features
+        features = self.product.get('features', '')
+        if features:
+            for key, value in guess_map.items():
+                if key in features:
+                    return value
+
+        # Check the description
+        description = self.product.get('description', '')
+        if description:
+            for key, value in guess_map.items():
+                if key in description:
+                    return value
+
+        # Check NumberOfItems and PackageQuantity
+        num_items = self.product.get('NumberOfItems', 0)
+        pack_quant = self.product.get('PackageQuantity', 0)
+        guess = max(num_items, pack_quant)
+
+        return guess if guess > 0 else None
 
 
     @QtCore.pyqtSlot()
     def saveGuess(self):
-        self._map[str(self.currentValue).lower().strip()] = self.guess
+        current = str(self.currentValue).lower().strip()
+        if isinstance(self._map, QuantityValidatorData):
+            self._map.map[current] = self.guess
+        else:
+            self._map[current] = self.guess
 
 
 ########################################################################################################################

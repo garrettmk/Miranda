@@ -8,7 +8,7 @@ ListView {
     id: root
     clip: true
 
-    property string title: "Object Table"
+    property variant title: null
     property var columns: []
     property Item headerTools
     property color headerBackgroundColor: Material.background
@@ -16,57 +16,70 @@ ListView {
     signal rowsRemoved()
     signal rowClicked(int index)
 
+    property var selectedIndices: []
+    property bool selectAll: false
+
     // Header
     headerPositioning: ListView.OverlayHeader
     header: Rectangle {
-        id: headerBackground
         z: 10
-        width: parent.width
+        id: headerBackground
         color: headerBackgroundColor
-        height: 64 + 56
+        height: headerLayout.implicitHeight
+        width: parent.width
+        implicitWidth: headerLayout.implicitWidth
+
+        Component.onCompleted: {
+            root.implicitWidth = implicitWidth
+        }
 
         ColumnLayout {
-            anchors.fill: parent
+            id: headerLayout
             spacing: 0
+            anchors.fill: parent
 
             // Title
             RowLayout {
-                id: headerLayout
-                height: 64
+                id: titleLayout
+                Layout.preferredHeight: root.title !== null || root.headerTools !== null ? 64 : 0
                 Layout.fillWidth: true
-                Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: 32
+                Layout.rightMargin: 32
 
                 Component.onCompleted: {
                     if (root.headerTools !== null) {
-                        root.headerTools.parent = headerLayout
-                        root.headerTools.Layout.rightMargin = 14
+                        root.headerTools.parent = headerToolsItem
                     }
                 }
 
                 M.Label {
                     type: "Headline"
-                    text: root.title
+                    visible: root.title !== null
+                    text: root.title !== null ? root.title : ""
                     Layout.alignment: Qt.AlignVCenter
-                    Layout.leftMargin: 24
                 }
 
-                Item {Layout.fillWidth: true}
+                Item { visible: root.title !== null; Layout.fillWidth: true }
+
+                Item {
+                    id: headerToolsItem
+                    Layout.rightMargin: 14
+                    implicitWidth: children.length === 1 ? children[0].implicitWidth : childrenRect.width
+                    implicitHeight: children.length === 1 ? children[0].implicitHeight : childrenRect.height
+                    Layout.alignment: Qt.AlignVCenter
+                }
             }
 
             // Column headers
             RowLayout {
-                height: 56
+                Layout.preferredHeight: 56
                 spacing: 0
-                Layout.fillWidth: true
                 Layout.leftMargin: 24
                 Layout.rightMargin: 24
 
-                MinusButton {
-                    enabled: model.length > 0
-                    onClicked: {
-                        root.model.clear()
-                        rowsRemoved()
-                    }
+                CheckBox {
+                    enabled: model !== undefined && model.length > 0
+                    onCheckedChanged: root.selectAll = checked
                 }
 
                 Repeater {
@@ -77,90 +90,18 @@ ListView {
                         elide: Text.ElideRight
                         Layout.preferredWidth: modelData.width
                         Layout.leftMargin: index < 2 ? 24 : 56
-                        horizontalAlignment: "alignment" in modelData ? modelData["alignment"] : index === 0 ? Text.AlignLeft : Text.AlignRight
+                        horizontalAlignment: "alignment" in modelData ? modelData["alignment"] : Qt.AlignLeft
                     }
                 }
-
-                Item {Layout.fillWidth: true}
             }
         }
 
         M.Divider {
-            anchors {
-                left: parent.left
-                right: parent.right
-                bottom: parent.bottom
-            }
+            width: parent.width
+            anchors.bottom: parent.bottom
         }
     }
 
-    // Row delegate
-    delegate: Item {
-        id: rowDelegate
-        width: parent.width
-        height: 48
-
-        property var rowObject: index >= 0 ? root.model.getObject(index) : null
-
-        Rectangle {
-            anchors.fill: parent
-            color: Material.theme === Material.Light ? "black" : "white"
-            opacity: rowMouseArea.containsMouse ? 0.08 : 0
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 150
-                    easing.type: Easing.InOutCubic
-                }
-            }
-
-        }
-
-        MouseArea {
-            id: rowMouseArea
-            anchors.fill: parent
-            hoverEnabled: true
-            onClicked: root.rowClicked(index)
-        }
-
-        RowLayout {
-            spacing: 0
-            anchors {
-                left: parent.left
-                right: parent.right
-                leftMargin: 24
-                rightMargin: 24
-                verticalCenter: parent.verticalCenter
-            }
-
-            MinusButton {
-                onClicked: {
-                    root.model.removeRow(index)
-                    rowsRemoved()
-                }
-            }
-
-            Repeater {
-                model: root.columns
-                delegate: M.Label {
-                    type: "Body 1"
-                    text: rowObject !== null ? rowObject[modelData.property] : ""
-                    elide: Text.ElideRight
-                    Layout.preferredWidth: modelData.width
-                    Layout.leftMargin: index < 2 ? 24 : 56
-                    horizontalAlignment: "alignment" in modelData ? modelData["alignment"] : index === 0 ? Text.AlignLeft : Text.AlignRight
-                }
-            }
-
-            Item {Layout.fillWidth: true}
-        }
-
-        M.Divider {
-            anchors {
-                bottom: parent.bottom
-                left: parent.left
-                right: parent.right
-            }
-        }
-    }
+    footerPositioning: ListView.OverlayFooter
+    footer: M.Divider { width: root.width }
 }

@@ -12,6 +12,7 @@ TextField {
     property Item prefix
     property Item suffix
     property alias labelText: label.text
+    property string helperText
 
     Component.onCompleted: {
         if (prefix !== null) {
@@ -19,7 +20,7 @@ TextField {
             prefix.anchors.left = root.left
             prefix.anchors.bottom = root.bottom
             prefix.anchors.bottomMargin = bottomPadding
-            leftPadding = prefix.width + 8
+            leftPadding = prefix.width + 16
 
             label.anchors.leftMargin = leftPadding
         }
@@ -29,17 +30,47 @@ TextField {
             suffix.anchors.right = root.right
             suffix.anchors.bottom = root.bottom
             suffix.anchors.bottomMargin = bottomPadding
-            rightPadding = suffix.width + 8
+            rightPadding = suffix.width + 16
 
             label.anchors.rightMargin = rightPadding
         }
     }
 
+    state: acceptableInput ? "Valid" : "Invalid"
+    states: [
+        State {
+            name: "Valid"
+            PropertyChanges {
+                target: backgroundRect
+                color: root.activeFocus ? Material.accent : Material.foreground
+            }
+            PropertyChanges {
+                target: label
+                color: root.activeFocus ? Material.accent : Material.foreground
+            }
+        },
+        State {
+            name: "Invalid"
+            PropertyChanges {
+                target: backgroundRect
+                color: Material.color(Material.Red, Material.Shade500)
+            }
+            PropertyChanges {
+                target: label
+                color: Material.color(Material.Red, Material.Shade500)
+            }
+        }
+    ]
+
     background: Rectangle {
+        id: backgroundRect
         implicitWidth: 100
         height: root.activeFocus || root.hovered ? 2 : 1
         color: root.activeFocus ? Material.accent : Material.foreground
         opacity: root.activeFocus ? 1.0 : 0.38
+        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on opacity { OpacityAnimator { duration: 100 } }
+
         anchors {
             left: parent.left
             right: parent.right
@@ -53,6 +84,8 @@ TextField {
         elide: Text.ElideRight
         color: root.activeFocus ? Material.accent : Material.foreground
         opacity: root.activeFocus ? 1 : 0.5
+        Behavior on opacity { OpacityAnimator { duration: 100 } }
+        Behavior on color { ColorAnimation { duration: 100 } }
         anchors {
             left: parent.left
             right: parent.right

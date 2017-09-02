@@ -34,14 +34,30 @@ Item {
         for (var i=0; i<validators.length; i++) {
             use = validatorRows.itemAt(i).useGuess
             save = validatorRows.itemAt(i).saveGuess
-
             if (save) validators[i].saveGuess()
             if (use) validators[i].apply()
         }
         database.saveObject(quantValidator.map)
     }
 
+    function setValidationLevel(level) {
+        if (level === "None")
+            for (var i=0; i<validators.length; i++)
+                validators[i].enabled = false
+        else if (level === "Manual"){
+            for (var i=0; i<validators.length; i++) {
+                validators[i].enabled = true
+                validators[i].alwaysApply = false
+            }
+        } else if (level === "Automatic") {
+            for (var i=0; i<validators.length; i++) {
+                validators[i].enabled = true
+                validators[i].alwaysApply = true
+            }
+        }
+    }
 
+    Component.onCompleted: setValidationLevel("Manual")
 
     ColumnLayout {
         id: layout
@@ -61,6 +77,8 @@ Item {
         Item {
             Layout.preferredHeight: 56
             Layout.preferredWidth: headerLayout.implicitWidth
+
+            Component.onCompleted: panel.implicitWidth = headerLayout.implicitWidth
 
             RowLayout {
                 id: headerLayout
@@ -94,6 +112,7 @@ Item {
             id: validatorRows
             model: validators
             delegate: Item {
+                id: validatorRowDelegate
                 Layout.fillWidth: true
                 Layout.preferredHeight: 48
 
@@ -129,102 +148,47 @@ Item {
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                     }
 
-                    Item {
+                    M.LabelWithEdit {
+                        id: currentValueLabel
                         Layout.leftMargin: 56
                         Layout.alignment: Qt.AlignVCenter
                         Layout.preferredWidth: layout.columns[2].width
                         Layout.preferredHeight: parent.height
 
-                        M.EditPopup {
-                            id: currentValueEdit
-                            onAccepted: {modelData.setCurrentValueWithEval(text); rebind()}
-                            onRejected: rebind()
-                            Component.onCompleted: rebind()
-                            function rebind() {
-                                text = Qt.binding(function() {return modelData.currentValue !== undefined ? typeof modelData.currentValue === "string" ? "'" + modelData.currentValue + "'" : modelData.currentValue : ""})
-                            }
+                        text: modelData.currentValue !== undefined ? typeof modelData.currentValue === "string" ? "'" + modelData.currentValue + "'" : modelData.currentValue : ""
+                        elide: Text.ElideRight
+                        color: modelData !== undefined ? modelData.isValid ? Material.color(Material.Green, Material.Shade500) : Material.color(Material.Red, Material.Shade500) : Material.foreground
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        editTools: M.TextField {
+                            id: editCurrentValueField
+                            labelText: "Current Value"
+                            onAccepted: currentValueLabel.popup.accept()
                         }
 
-                        M.Label {
-                            type: "Body 1"
-                            text: modelData.currentValue !== undefined ? typeof modelData.currentValue === "string" ? "'" + modelData.currentValue + "'" : modelData.currentValue : ""
-                            elide: Text.ElideRight
-                            color: modelData !== undefined ? modelData.isValid ? Material.color(Material.Green, Material.Shade500) : Material.color(Material.Red, Material.Shade500) : Material.foreground
-                            Behavior on color { ColorAnimation { duration: 100 } }
-
-                            anchors {
-                                left: parent.left
-                                verticalCenter: parent.verticalCenter
-                            }
-                        }
-
-                        M.SystemIcon {
-                            source: "icons/edit.png"
-                            opacity: 0.54
-                            sourceSize {
-                                width: 18
-                                height: 18
-                            }
-                            anchors {
-                                right: parent.right
-                                verticalCenter: parent.verticalCenter
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    currentValueEdit.open()
-                                }
-                            }
-                        }
+                        onEditClicked: { editCurrentValueField.text = text; editGuessField.selectAll(); editCurrentValueField.focus = true }
+                        onEditAccepted: modelData.setCurrentValueWithEval(editCurrentValueField.text)
                     }
 
-                    Item {
+                    M.LabelWithEdit {
+                        id: guessLabel
                         Layout.leftMargin: 56
                         Layout.alignment: Qt.AlignVCenter
                         Layout.preferredWidth: layout.columns[3].width
                         Layout.preferredHeight: parent.height
 
-                        M.EditPopup {
-                            id: guessEdit
-                            onAccepted: {modelData.setGuessWithEval(text); rebind()}
-                            onRejected: rebind()
-                            Component.onCompleted: rebind()
-                            function rebind() {
-                                text = Qt.binding(function() {return modelData.guess !== undefined ? typeof modelData.guess === "string" ? "'" + modelData.guess + "'" : modelData.guess : ""})
-                            }
+                        text: modelData.guess !== undefined ? typeof modelData.guess === "string" ? "'" + modelData.guess + "'" : modelData.guess : "None"
+                        color: modelData !== undefined ? modelData.guessIsValid ? Material.color(Material.Green, Material.Shade500) : Material.color(Material.Red, Material.Shade500) : Material.foreground
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        editTools: M.TextField {
+                            id: editGuessField
+                            labelText: "Guessed Value"
+                            onAccepted: guessLabel.popup.accept()
                         }
 
-                        M.Label {
-                            type: "Body 1"
-                            text: modelData.guess !== undefined ? typeof modelData.guess === "string" ? "'" + modelData.guess + "'" : modelData.guess : "None"
-                            color: modelData !== undefined ? modelData.guessIsValid ? Material.color(Material.Green, Material.Shade500) : Material.color(Material.Red, Material.Shade500) : Material.foreground
-                            Behavior on color { ColorAnimation { duration: 100 } }
-                            anchors {
-                                left: parent.left
-                                verticalCenter: parent.verticalCenter
-                            }
-                        }
-
-                        M.SystemIcon {
-                            source: "icons/edit.png"
-                            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                            opacity: 0.54
-                            sourceSize {
-                                width: 18
-                                height: 18
-                            }
-                            anchors {
-                                right: parent.right
-                                verticalCenter: parent.verticalCenter
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    guessEdit.open()
-                                }
-                            }
-                        }
+                        onEditClicked: { editGuessField.text = text; editGuessField.selectAll(); editGuessField.focus = true }
+                        onEditAccepted: modelData.setGuessWithEval(editGuessField.text)
                     }
 
                     CheckBox {

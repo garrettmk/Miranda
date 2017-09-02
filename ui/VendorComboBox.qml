@@ -11,22 +11,25 @@ ComboBox {
 
     onCurrentIndexChanged: {
         if (currentIndex === 0) {
-            currentVendor = null
+            if (currentVendor !== null)
+                currentVendor = null
         } else {
-            currentVendor = vendorsModel.getObject(currentIndex - 1)
+            var vend = vendorsModel.getObject(currentIndex - 1)
+            if (currentVendor !== vend)
+                currentVendor = vend
         }
     }
 
-    onCurrentVendorChanged: {
-        var idx = 0
-
-        if (typeof currentVendor === "string") {
-            idx = vendorsModel.matchOne("id", currentVendor)
-            currentIndex = idx + 1
-        } else if (typeof currentVendor === "object") {
-            idx = vendorsModel.matchObject(currentVendor)
-            if (idx != currentIndex - 1)
-                currentIndex = idx + 1
+    onCurrentVendorChanged: {        
+        if (currentVendor === undefined || currentVendor === null) {
+            if (currentIndex > 0)
+                currentIndex = 0
+        } else if (vendorsModel.contains(currentVendor)) {
+            var idx = vendorsModel.matchObject(currentVendor) + 1
+            if (currentIndex !== idx)
+                currentIndex = idx
+        } else if (typeof currentVendor === "string" || typeof currentVendor === "object") {
+            currentVendor = database.getVendor(currentVendor)
         }
     }
 

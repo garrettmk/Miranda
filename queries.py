@@ -1,5 +1,7 @@
 import cupi as qp
 import PyQt5.QtCore as qtc
+from models import Vendor
+from bson import ObjectId
 
 
 ########################################################################################################################
@@ -78,6 +80,9 @@ class ProductQueryDocument(qp.MongoQueryDocument):
     feedbackChanged = qtc.pyqtSignal()
     feedback = qp.QueryProperty('feedback', 'range_min', notify=feedbackChanged)
 
+    tagsChanged = qtc.pyqtSignal()
+    tags = qp.QueryProperty('tags', 'elements_all', notify=tagsChanged)
+
 
 ########################################################################################################################
 
@@ -101,3 +106,127 @@ class ProductSortDocument(qp.MongoSortDocument):
 
     feedbackChanged = qtc.pyqtSignal()
     feedback = qp.SortProperty('feedback', notify=feedbackChanged)
+
+
+########################################################################################################################
+
+
+class OpportunityQueryDocument(qp.MongoQueryDocument):
+
+    marketVendorChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=marketVendorChanged)
+    def marketVendor(self):
+        return str(self.get('market_listing.vendor_id', ''))
+
+    @marketVendor.setter
+    def marketVendor(self, obj):
+        if obj is None:
+            _id = None
+        elif isinstance(obj, ObjectId):
+            _id = obj
+        elif isinstance(obj, str):
+            _id = ObjectId(obj) if len(obj) else None
+        elif isinstance(obj, qp.MapObjectReference):
+            _id = obj.referentId
+        elif isinstance(obj, Vendor):
+            _id = obj._id
+        else:
+            raise TypeError(f'Expected ObjectId, MapObjectReference, Vendor, or None; got {obj}')
+
+        if _id is None:
+            self.deleteFilter('market_listing.vendor_id')
+        else:
+            self.filterBy('market_listing.vendor_id', 'equals', _id)
+
+    supplierVendorChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=supplierVendorChanged)
+    def supplierVendor(self):
+        return str(self.get('supplier_listing.vendor_id', ''))
+
+    @supplierVendor.setter
+    def supplierVendor(self, obj):
+        if obj is None:
+            self.deleteFilter('supplier_listing.vendor_id')
+            return
+        elif isinstance(obj, ObjectId):
+            _id = obj
+        elif isinstance(obj, qp.MapObjectReference):
+            _id = obj.referentId
+        elif isinstance(obj, Vendor):
+            _id = obj._id
+        else:
+            raise TypeError(f'Expected ObjectId, MapObjectReference, Vendor, or None; got {obj}')
+
+        self.filterBy('supplier_listing.vendor_id', 'equals', _id)
+
+    marketListingChanged = qtc.pyqtSignal()
+    marketListing = qp.QueryReferenceProperty('market_listing', notify=marketListingChanged)
+
+    supplierListingChanged = qtc.pyqtSignal()
+    supplierListing = qp.QueryReferenceProperty('supplier_listing', notify=supplierListingChanged)
+
+    minProfitChanged = qtc.pyqtSignal()
+    minProfit = qp.QueryProperty('profit', 'range_min', notify=minProfitChanged)
+
+    minMarginChanged = qtc.pyqtSignal()
+    minMargin = qp.QueryProperty('margin', 'range_min', notify=minMarginChanged)
+
+    minROIChanged = qtc.pyqtSignal()
+    minROI = qp.QueryProperty('roi', 'range_min', notify=minROIChanged)
+
+
+########################################################################################################################
+
+
+class OpportunitySortDocument(qp.MongoSortDocument):
+
+    marketVendorChanged = qtc.pyqtSignal()
+    marketVendor = qp.SortProperty('market_listing.vendor_id', notify=marketVendorChanged)
+
+    supplierVendorChanged = qtc.pyqtSignal()
+    supplierVendor = qp.SortProperty('supplier_listing.vendor_id', notify=supplierVendorChanged)
+
+    profitChanged = qtc.pyqtSignal()
+    profit = qp.SortProperty('profit', notify=profitChanged)
+
+    marginChanged = qtc.pyqtSignal()
+    margin = qp.SortProperty('margin', notify=marginChanged)
+
+    roiChanged = qtc.pyqtSignal()
+    roi = qp.SortProperty('roi', notify=roiChanged)
+
+
+########################################################################################################################
+
+
+class OperationQueryDocument(qp.MongoQueryDocument):
+
+    activeChanged = qtc.pyqtSignal()
+    active = qp.QueryProperty('active', 'equals', notify=activeChanged)
+
+    minPriorityChanged = qtc.pyqtSignal()
+    minPriority = qp.QueryProperty('priority', 'range_min', notify=minPriorityChanged)
+
+    scheduledBeforeChanged = qtc.pyqtSignal()
+    scheduledBefore = qp.QueryProperty('scheduled', 'range_max', notify=scheduledBeforeChanged)
+
+    nameChanged = qtc.pyqtSignal()
+    name = qp.QueryProperty('name', 'regex', notify=nameChanged)
+
+    opTypeChanged = qtc.pyqtSignal()
+    opType = qp.QueryProperty('_type', 'equals', notify=opTypeChanged)
+
+
+########################################################################################################################
+
+
+class OperationSortDocument(qp.MongoSortDocument):
+
+    priorityChanged = qtc.pyqtSignal()
+    priority = qp.SortProperty('priority', notify=priorityChanged)
+
+    scheduledChanged = qtc.pyqtSignal()
+    scheduled = qp.SortProperty('scheduled', notify=scheduledChanged)
+
+    typeChanged = qtc.pyqtSignal()
+    type = qp.SortProperty('_type', notify=typeChanged)

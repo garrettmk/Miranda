@@ -32,16 +32,15 @@ ApplicationWindow {
         onAccepted: database.connect(dbName, uri)
     }
 
-    // FAB to open the nav drawer
-    M.FloatingActionButton {
+    M.IconToolButton {
+        z: 50
         id: drawerFAB
-        iconSource: "icons/menu.png"
+        iconSource: "../icons/menu.png"
         onClicked: drawer.visible = true
         anchors {
-            bottom: parent.bottom
+            top: parent.top
             left: parent.left
-            bottomMargin: 8
-            leftMargin: 8
+            margins: 8
         }
     }
 
@@ -155,6 +154,14 @@ ApplicationWindow {
                 state: database.connected ? contentStack.currentIndex === 3 ? "ActiveFocused" : "ActiveUnfocused" : "Inactive"
             }
 
+            M.NavItem {
+                text: "Opportunities"
+                iconSource: "../icons/money.png"
+                Layout.fillWidth: true
+                onClicked: contentStack.currentIndex = 4
+                state: database.connected ? contentStack.currentIndex === 4 ? "ActiveFocused" : "ActiveUnfocused" : "Inactive"
+            }
+
             Item {Layout.fillHeight: true}
         }
 
@@ -164,7 +171,7 @@ ApplicationWindow {
    StackLayout {
        id: contentStack
        anchors.fill: parent
-       currentIndex: 4
+       currentIndex: 5
        onCurrentIndexChanged: {
            drawer.visible = false
            var current = children[currentIndex]
@@ -185,12 +192,22 @@ ApplicationWindow {
            source: "VendorsView.qml"
        }
 
-       Loader {}
+       Loader {
+           focus: true
+           active: false
+           source: "OperationsView.qml"
+       }
 
        Loader {
            focus: true
            active: false
            source: "DatabaseView.qml"
+       }
+
+       Loader {
+           focus: true
+           active: false
+           source: "OpportunitiesView.qml"
        }
 
        Item {}

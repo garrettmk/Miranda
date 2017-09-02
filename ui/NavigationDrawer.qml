@@ -47,6 +47,12 @@ Drawer {
             Layout.fillWidth: true
         }
 
+        M.NavItem {
+            text: "Opportunities"
+            iconSource: "../icons/money.png"
+            Layout.fillWidth: true
+        }
+
         Item {Layout.fillHeight: true}
     }
 

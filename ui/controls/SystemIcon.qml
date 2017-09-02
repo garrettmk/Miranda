@@ -7,6 +7,7 @@ Image {
         width: 24
         height: 24
     }
+    Behavior on opacity { OpacityAnimator { duration: 100 } }
 
     state: enabled ? "ActiveUnfocused" : "Inactive"
     states: [

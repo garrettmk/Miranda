@@ -7,135 +7,223 @@ import ObjectModel 1.0
 import Vendor 1.0
 
 
-BrowserView {
+TableBrowserView {
     id: root
     title: "Vendors"
-    Material.primary: Material.color(Material.Purple, Material.Shade700)
-    Material.accent: Material.color(Material.Green, Material.Shade500)
 
-    property ObjectModel selectionModel: ObjectModel {}
+    Material.primary: Material.color(Material.Purple, Material.Shade500)
+    Material.accent: Material.color(Material.Teal, Material.Shade500)
 
-    // Dialogs
+    mainToolBarColor: Material.primary
+    sideToolBarColor: Material.color(Material.Purple, Material.Shade800)
+    addNewButtonColor: Material.color(Material.Purple, Material.ShadeA200)
+
+    queryDialog.onlyShow: "Vendors"
+
+    Component.onCompleted: model = database.getModel(database.newVendorQuery())
+
     EditVendorDialog {
         id: editVendorDialog
-
         onAccepted: {
-            if (!model.contains(vendor)) {
-                model.insert(0, vendor)
-            }
-
             database.saveObject(vendor)
-            vendor = null
         }
 
         onRejected: {
-            if (!model.contains(vendor)) {
-                vendor.destroy()
-            }
-
-            vendor = null
-        }
-    }
-
-    ImportDialog {
-        id: importDialog
-        Material.theme: parent.Material.theme
-        Material.primary: parent.Material.primary
-        Material.accent: parent.Material.accent
-    }
-
-    // View body
-    queryBuilder: VendorQueryBuilder {}
-
-    // Card delegate
-    cardDelegate: VendorCard {
-        id: vendorCard
-        property Vendor vendor: index >= 0 ? root.model.getObject(index) : null
-        selected: selectionModel.contains(vendor)
-        Material.theme: root.Material.theme
-        Material.primary: Material.color(Material.Purple, Material.Shade600)
-        Material.accent: root.Material.accent
-
-        onSelectButtonClicked: {
-            if (!selected) {
-                selectionModel.removeRow(selectionModel.matchObject(vendor))
-            } else {
-                selectionModel.append(vendor)
-            }
-            selected = Qt.binding(function() {return selectionModel.contains(vendor)})
-        }
-
-
-        property var conn: Connections {
-            target: selectionModel
-            onModelReset: vendorCard.selected = Qt.binding(function() {return selectionModel.contains(vendor)})
-            onRowsRemoved: vendorCard.selected = Qt.binding(function() {return selectionModel.contains(vendor)})
-        }
-
-        actionMenu: Menu {
-            MenuItem {
-                text: "Edit"
-                onTriggered: {
-                    editVendorDialog.vendor = vendor
-                    editVendorDialog.open()
+            if (vendor !== null && vendor !== undefined)
+                if (!model.contains(vendor)) {
+                    vendor.destroy()
+                    vendor = null
                 }
-            }
-            MenuItem {
-                text: "Import..."
-                onTriggered: {
-                    importDialog.vendor = vendor
-                    importDialog.open()
-                }
-            }
         }
     }
 
-    // Comparison tool
-    toolArea: M.ObjectTable {
-        id: selectionTable
-        title: "(" + model.length + ") selected:"
-        model: selectionModel
+    M.CenteredModalDialog {
+        id: confirmDeleteDialog
+        title: "Confirm Delete"
+        standardButtons: Dialog.Yes | Dialog.No
 
-        columns: [
-            {name: "Title", property: "title", width: 200},
-            {name: "Website", property: "website", width: 175, alignment: Text.AlignLeft}
-        ]
-
-        headerTools: M.IconToolButton {
-            enabled: selectionModel.length > 0
-            iconSource: "../icons/dots_vertical.png"
-            onClicked: selectionTableMenu.open()
-
-            Menu {
-                id: selectionTableMenu
-                MenuItem {
-                    text: "Delete"
-                    enabled: selectionModel.length > 0
-                    onTriggered: {
-                        database.deleteModel(selectionModel)
-
-                        var idx = 0
-                        for (var i=0; i<selectionModel.length; i++) {
-                            idx = root.model.matchObject(selectionModel.getObject(i))
-                            root.model.removeRow(idx)
-                        }
-
-                        selectionModel.clear()
-                    }
-                }
-            }
+        M.Label {
+            id: messageLabel
+            type: "Body 1"
+            text: "Are you sure you want to delete the selected vendors?"
         }
 
-        onRowClicked: {
-            var idx = root.model.matchObject(selectionModel.getObject(index))
-            cardListView.positionViewAtIndex(idx, ListView.Beginning)
+        onAccepted: {
+            var obj
+            var selected = table.selectedIndices
+            selected.sort(function(a, b) { return b - a }) // Sort descending
+            for (var i=0; i<selected.length; i++) {
+                obj = model.getObject(selected[i])
+                model.removeRow(selected[i])
+                database.deleteObject(obj)
+                obj.destroy()
+            }
+            table.selectedIndices = []
         }
     }
 
-    // New vendor action
-    onNewItemClicked: {
-        var vnd = Qt.createQmlObject("import QtQuick 2.7; import Vendor 1.0; Vendor {}", editVendorDialog)
-        editVendorDialog.vendor = vnd
+    actionOnSelectedMenu: Menu {
+        MenuItem {
+            text: "Delete " + table.selectedIndices.length + " vendors..."
+            onClicked: confirmDeleteDialog.open()
+        }
+    }
+
+    onAddNewButtonClicked: {
+        var vend = Qt.createQmlObject("import QtQuick 2.7; import Vendor 1.0; Vendor {}", editVendorDialog)
+        editVendorDialog.vendor = vend
         editVendorDialog.open()
+    }
+
+    columns: [
+        {name: "Title", width: 300},
+        {name: "Website", width: 300},
+        {name: "Market", width: 75},
+        {name: "Sales Tax", width: 75},
+        {name: "Avg. Shipping (%)", width: 125}
+    ]
+
+    tableRowDelegate: M.TableRow {
+        onClicked: table.currentIndex = index
+
+        M.Label {
+            type: "Body 1"
+            text: title !== undefined ? title : "n/a"
+            elide: Text.ElideRight
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: website !== undefined ? website : "n/a"
+            elide: Text.ElideRight
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: isMarket !== undefined ? isMarket ? "Yes" : "No" : "n/a"
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: salesTax !== undefined ? salesTax ? "Yes" : "No" : "n/a"
+        }
+
+        M.Label {
+            type: "Body 1"
+            text: shippingRate !== undefined ? (shippingRate * 100).toFixed(1) + "%" : "n/a"
+        }
+    }
+
+    sideToolBar: Item {
+        M.IconToolButton {
+            iconSource: "../icons/edit.png"
+            enabled: root.currentObject !== null
+            anchors {
+                top: parent.top
+                right: parent.right
+                margins: 8
+            }
+            onClicked: {
+                editVendorDialog.vendor = root.currentObject
+                editVendorDialog.open()
+            }
+        }
+
+        M.Label {
+            type: "Headline"
+            text: root.currentObject !== null ? root.currentObject.title !== undefined ? root.currentObject.title : "n/a" : ""
+            verticalAlignment: Text.AlignBottom
+            wrapMode: Text.Wrap
+            anchors {
+                bottom: parent.bottom
+                left: parent.left
+                right: parent.right
+                margins: 24
+            }
+        }
+    }
+
+    sidePanel: ColumnLayout {
+        anchors.top: parent.top
+        width: parent.width
+        spacing: 0
+        enabled: root.currentObject !== null
+
+        M.ProductImage {
+            Layout.fillWidth: true
+            Layout.preferredHeight: width / (16/9)
+            source: enabled ? root.currentObject.imageUrl : ""
+        }
+
+        GridLayout {
+            Layout.fillWidth: true
+            Layout.margins: 24
+            columns: 2
+            columnSpacing: 32
+            rowSpacing: 8
+
+            M.Label {
+                type: "Body 2"
+                opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                Layout.alignment: Qt.AlignRight
+                text: "Website:"
+            }
+
+            M.LinkLabel {
+                type: "Body 1"
+                opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                text: enabled ? root.currentObject.website !== undefined ? root.currentObject.website : "n/a" : ""
+                link: enabled && root.currentObject.website !== undefined ? root.currentObject.website : ""
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+            }
+
+            M.Label {
+                type: "Body 2"
+                opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                Layout.alignment: Qt.AlignRight
+                text: "Market:"
+            }
+
+            M.LinkLabel {
+                type: "Body 1"
+                opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                text: enabled ? root.currentObject.isMarket ? "Yes" : "No" : ""
+                elide: Text.ElideRight
+            }
+
+            M.Label {
+                type: "Body 2"
+                opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                Layout.alignment: Qt.AlignRight
+                text: "Sales Tax:"
+            }
+
+            M.LinkLabel {
+                type: "Body 1"
+                opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                text: enabled ? root.currentObject.salesTax ? "Yes" : "No" : ""
+                elide: Text.ElideRight
+            }
+
+            M.Label {
+                type: "Body 2"
+                opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                Layout.alignment: Qt.AlignRight
+                text: "Avg. Shipping:"
+            }
+
+            M.LinkLabel {
+                type: "Body 1"
+                opacity: Material.theme === Material.Light ? 0.54 : 0.70
+                text: enabled ? root.currentObject.shippingRate !== undefined ? (root.currentObject.shippingRate * 100).toFixed(1) + "%" : "n/a" : ""
+                elide: Text.ElideRight
+            }
+        }
+
+        M.Divider {
+            Layout.fillWidth: true
+        }
+
     }
 }

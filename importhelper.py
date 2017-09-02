@@ -1,4 +1,4 @@
-import csv, os, sip, json
+import csv, os, sip, json, itertools
 import cupi as qp
 from PyQt5 import QtCore, QtQml
 from models import Product
@@ -236,7 +236,7 @@ class FileImportHelper(QtCore.QObject):
                         data[key] = validation[str(value)]
 
             product.update(data)
-            product.tags += self._tags
+            product.tags = list(set(itertools.chain(product.tags, self._tags)))
 
             self.set_current_product(product)
 

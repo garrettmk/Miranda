@@ -5,23 +5,17 @@ import "controls" as M
 import Product 1.0
 
 
-Dialog {
+M.CenteredModalDialog {
     id: root
-    modal: true
     title: "Validate Product"
-    standardButtons:  Dialog.Apply | Dialog.Cancel
-
-    x: ApplicationWindow.window.width / 2 - width / 2
-    y: ApplicationWindow.window.height / 2 - height / 2
-
+    standardButtons:  Dialog.Save | Dialog.Cancel
     padding: 24
 
     property alias product: validatorPanel.product
 
-    onAccepted: validatorPanel.apply()
+    onAccepted: { validatorPanel.apply(); database.saveObject(product) }
 
     ProductValidatorPanel {
         id: validatorPanel
-        anchors.fill: parent
     }
 }

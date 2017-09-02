@@ -7,78 +7,63 @@ import ObjectModel 1.0
 import MapObject 1.0
 
 
-BrowserView {
+TableBrowserView {
     id: root
     title: "Database"
-    Material.primary: Material.color(Material.Orange, Material.Shade700)
+
+    Material.primary: Material.color(Material.Orange, Material.Shade500)
     Material.accent: Material.color(Material.Blue, Material.Shade500)
 
-    property ObjectModel selectionModel: ObjectModel {}
+    mainToolBarColor: Material.primary
+    sideToolBarColor: Material.color(Material.Orange, Material.Shade800)
+    addNewButtonColor: Material.color(Material.Orange, Material.ShadeA200)
+    addNewButtonVisible: false
 
-    // View body
-    queryBuilder: DatabaseQueryBuilder {}
+    columns: [
+        {name: "ObjectId", width: 400},
+        {name: "Object Type", width: 150}
+    ]
 
-    cardDelegate: DocumentCard {
-        id: documentCard
-        property MapObject object: index >= 0 ? ListView.view.model.getObject(index) : null
-        selected: selectionModel.contains(object)
-        Material.theme: root.Material.theme
-        Material.primary: Material.color(Material.Orange, Material.Shade600)
-        Material.accent: root.Material.accent
+    tableRowDelegate: M.TableRow {
+        onClicked: table.currentIndex = index
 
-        onSelectButtonClicked: {
-            if (!selected) {
-                selectionModel.removeRow(selectionModel.matchObject(object))
-            } else {
-                selectionModel.append(object)
-            }
-            selected = Qt.binding(function() {return selectionModel.contains(object)})
+        M.Label {
+            type: "Body 1"
+            text: "ObjectId('" + id + "')"
         }
 
-        property var conn: Connections {
-            target: selectionModel
-            onModelReset: documentCard.selected = Qt.binding(function() {return selectionModel.contains(object)})
-            onRowsRemoved: documentCard.selected = Qt.binding(function() {return selectionModel.contains(object)})
-        }
-
-        actionMenu: Menu {
-            MenuItem {
-                text: "Copy id"
-                onTriggered: application.setClipboardText(id)
-            }
+        M.Label {
+            type: "Body 1"
+            text: pythonClassName
         }
     }
 
-    toolArea: M.ObjectTable {
-        id: selectionTable
-        title: model.length + " selected"
-        model: selectionModel
-
-        columns: [
-            {name: "_id", property: "id", width: 400}
-        ]
-
-        headerTools: M.IconToolButton {
-            enabled: selectionModel.length > 0
-            iconSource: "../icons/dots_vertical.png"
-            onClicked: selectionTableMenu.open()
-
-            Menu {
-                id: selectionTableMenu
-
-                MenuItem {
-                    text: "Update..."
-                }
-
-                MenuItem {
-                    text: "Delete..."
-                }
-            }
+    sideToolBar: Item {
+        M.Label {
+            anchors.fill: parent
+            anchors.margins: 24
+            type: "Headline"
+            text: root.currentObject !== null ? "ObjectId('" + root.currentObject.id + "')" : ""
+            verticalAlignment: Text.AlignBottom
+            wrapMode: Text.Wrap
         }
+    }
 
-        onRowClicked: {
-            var idx = root.model.matchObject(selectionModel.getObject(index))
-            cardListView.positionViewAtIndex(idx, ListView.beginning)
+    sidePanel: Flickable {
+        clip: true
+        anchors.fill: parent
+        anchors.margins: 24
+        contentWidth: width
+        contentHeight: documentLabel.implicitHeight
+
+        M.Label {
+            id: documentLabel
+            width: parent.width
+            type: "Body 1"
+            text: currentObject !== null ? currentObject.currentDocumentText : ""
+            wrapMode: Text.Wrap
+            font.family: "Courier"
+            padding: 24
         }
     }
 }

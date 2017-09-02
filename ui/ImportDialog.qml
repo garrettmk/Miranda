@@ -13,23 +13,13 @@ import QuantityValidator 1.0
 import RankValidator 1.0
 
 
-Dialog {
+M.CenteredModalDialog {
     id: dialog
-    modal: true
     title: "Import Products"
     standardButtons: Dialog.NoButton
 
-    x: ApplicationWindow.window.width / 2 - width / 2
-    y: ApplicationWindow.window.height / 2 - height / 2
     width: 800
     height: width / (4/3)
-
-    Behavior on height {
-        NumberAnimation {
-            duration: 300
-            easing.type: Easing.InOutCubic
-        }
-    }
 
     property alias vendor: vendorBox.currentVendor
     property FileImportHelper helper: FileImportHelper {
@@ -191,6 +181,7 @@ Dialog {
                     M.ChipEditor {
                         id: chipEditor
                         Layout.fillWidth: true
+                        onModelChanged: helper.tags = model
                     }
 
                     M.SystemIcon {
@@ -199,7 +190,8 @@ Dialog {
 
                     ComboBox {
                         model: ["None", "Manual", "Automatic"]
-                        currentIndex: 0
+                        currentIndex: 1
+                        onActivated: validatorPanel.setValidationLevel(model[index])
                     }
                 }
             }
@@ -312,7 +304,7 @@ Dialog {
             visible: !helper.complete
             text: view.currentIndex == 1 ? "Import" : "Next"
             flat: true
-            enabled: view.currentIndex == 0 ? filenameField.text : view.currentIndex == 1 ?  helper.canImport : false
+            enabled: view.currentIndex == 0 ? filenameField.text && vendorBox.currentIndex : view.currentIndex == 1 ?  helper.canImport : false
             onClicked: view.incrementCurrentIndex()
         }
         Button {

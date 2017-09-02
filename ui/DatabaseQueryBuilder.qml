@@ -29,7 +29,7 @@ Item {
 
         ComboBox {
             id: typeBox
-            model: ["Vendors", "Products"]
+            model: ["Vendors", "Products", "Operations", "Opportunities"]
             Layout.fillWidth: true
             Layout.topMargin: 8
         }
@@ -42,6 +42,8 @@ Item {
 
             VendorQueryBuilder {}
             ProductQueryBuilder {}
+            OperationQueryBuilder {}
+            RelationshipQueryBuilder {}
         }
     }
 }

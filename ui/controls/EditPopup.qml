@@ -1,5 +1,6 @@
 import QtQuick 2.7
 import QtQuick.Controls 2.1
+import QtQuick.Controls.Material 2.1
 import "." as M
 
 
@@ -8,21 +9,13 @@ Dialog {
     dim: false
     focus: true
     modal: true
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
     header: null
     footer: null
-    standardButtons: Dialog.NoButton
     padding: 24
-    topPadding: 8
-
-    property alias text: textField.text
-    property alias labelText: textField.labelText
-
-    onOpened: textField.selectAll()
-
-    M.TextField {
-        id: textField
-        implicitWidth: 150
-        onAccepted: root.accept()
-    }
+    topPadding: 0
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+    standardButtons: Dialog.NoButton
+    Material.theme: parent.Material.theme
+    Material.foreground: parent.Material.foreground
+    Material.accent: parent.Material.accent
 }

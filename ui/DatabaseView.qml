@@ -34,7 +34,7 @@ TableBrowserView {
 
         M.Label {
             type: "Body 1"
-            text: pythonClassName
+            text: root.currentObject !== null ? pythonClassName : ""
         }
     }
 

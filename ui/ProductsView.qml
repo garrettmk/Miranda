@@ -6,7 +6,7 @@ import "controls" as M
 import ObjectModel 1.0
 import Product 1.0
 import ProfitRelationship 1.0
-//import QtCharts 2.2
+import QtCharts 2.2
 
 
 TableBrowserView {
@@ -22,7 +22,7 @@ TableBrowserView {
 
     queryDialog.onlyShow: "Products"
 
-    Component.onCompleted: model = database.getModel(database.newProductQuery())
+    Component.onCompleted: model = database.getParentedModel(database.newProductQuery(), root)
 
     mainToolButtons: M.IconToolButton {
         iconSource: "../icons/import.png"
@@ -70,43 +70,21 @@ TableBrowserView {
         }
     }
 
-    M.CenteredModalDialog {
+    EditTagsDialog {
         id: groupEditTagsDialog
-        property bool adding: true
-
-        title: adding ? "Add Tags" : "Remove Tags"
-        standardButtons: Dialog.Ok | Dialog.Cancel
-
-        implicitWidth: 450
-        contentHeight: groupChipEditor.implicitHeight
-        padding: 24
-
-        RowLayout {
-            anchors.fill: parent
-            spacing: 32
-            M.SystemIcon {
-                source: "icons/tag.png"
-            }
-
-            M.ChipEditor {
-                id: groupChipEditor
-                Layout.fillWidth: true
-            }
-        }
-
         onAccepted: {
             var obj
             var selected = table.selectedIndices
             for (var i=0; i<selected.length; i++) {
                 obj = model.getObject(selected[i])
                 if (adding)
-                    obj.addTags(groupChipEditor.model)
+                    obj.addTags(tags)
                 else
-                    obj.removeTags(groupChipEditor.model)
+                    obj.removeTags(tags)
 
                 database.saveObject(obj)
             }
-            groupChipEditor.clear()
+            tags = []
         }
 
     }
@@ -128,12 +106,8 @@ TableBrowserView {
 
     actionOnSelectedMenu: Menu {
         MenuItem {
-            text: "Add tags..."
-            onTriggered: { groupEditTagsDialog.adding = true; groupEditTagsDialog.open() }
-        }
-        MenuItem {
-            text: "Remove tags..."
-            onTriggered: { groupEditTagsDialog.adding = false; groupEditTagsDialog.open() }
+            text: "Edit tags..."
+            onTriggered: groupEditTagsDialog.open()
         }
         MenuItem {
             text: "Delete..."
@@ -261,12 +235,15 @@ TableBrowserView {
             M.Divider { Layout.fillWidth: true }
 
             GridLayout {
-                Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: true
                 Layout.margins: 24
                 rows: 5
                 flow: GridLayout.TopToBottom
                 columnSpacing: 32
                 rowSpacing: 8
+
+                Layout.preferredHeight: implicitHeight
+                Behavior on Layout.preferredHeight { NumberAnimation { duration: 500 } }
 
                 // Column 1
                 M.Label {
@@ -308,30 +285,36 @@ TableBrowserView {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? database.getVendorName(root.currentObject.vendor) : ""
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
                 }
 
                 M.Label {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.sku : ""
+                    elide: Text.ElideRight
                 }
 
                 M.Label {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.category !== undefined ? root.currentObject.category : "n/a" : ""
+                    elide: Text.ElideRight
                 }
 
                 M.Label {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.rank !== undefined ? root.currentObject.rank.toLocaleString() : "n/a" : ""
+                    elide: Text.ElideRight
                 }
 
                 M.Label {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.feedback !== undefined ? (root.currentObject.feedback * 100).toFixed() + "%" : "n/a" : ""
+                    elide: Text.ElideRight
                 }
 
                 // Column 2
@@ -374,30 +357,36 @@ TableBrowserView {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.brand !== undefined ? root.currentObject.brand : "n/a" : ""
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
                 }
 
                 M.Label {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.model !== undefined ? root.currentObject.model : "n/a" : ""
+                    elide: Text.ElideRight
                 }
 
                 M.Label {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.upc !== undefined ? root.currentObject.upc : "n/a" : ""
+                    elide: Text.ElideRight
                 }
 
                 M.Label {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.price !== undefined ? "$" + root.currentObject.price.toFixed(2) : "n/a" : ""
+                    elide: Text.ElideRight
                 }
 
                 M.Label {
                     type: "Body 1"
                     opacity: Material.theme === Material.Light ? 0.54 : 0.70
                     text: enabled ? root.currentObject.quantity !== undefined ? root.currentObject.quantity.toLocaleString() : "n/a" : ""
+                    elide: Text.ElideRight
                 }
             }
 
@@ -414,31 +403,176 @@ TableBrowserView {
                 Layout.fillWidth: true
             }
 
-//            ChartView {
-//                id: chart
-//                title: "Test Chart"
-//                Layout.fillWidth: true
-//                Layout.preferredHeight: width / (16/9)
-//                legend.alignment: Qt.AlignBottom
-//                antialiasing: true
+            ProductHistoryChart {
+                id: chart
+                Layout.topMargin: 24
+                Layout.fillWidth: true
+                Layout.preferredHeight: width / (16/9)
+                product: root.currentObject
+            }
 
-//                property var model: [
-//                    { x: 0, y: 0 },
-//                    { x: 1.1, y: 3.2 },
-//                    { x: 1.9, y: 2.4 },
-//                    { x: 2.1, y: 2.1 },
-//                    { x: 2.9, y: 2.9 }
-//                ]
+            M.Divider {
+                Layout.topMargin: 32
+                Layout.fillWidth: true
+            }
 
-//                Component.onCompleted: {
-//                    model.forEach( function (x) {series.append(x.x, x.y)} )
-//                }
+            ListView {
+                id: oppTable
+                clip: true
+                Layout.topMargin: 0
+                Layout.rightMargin: 24
+                Layout.leftMargin: 24
+                Layout.fillWidth: true
+                Layout.preferredHeight: 300
 
-//                SplineSeries {
-//                        id: series
+                Connections {
+                    target: root
+                    onCurrentObjectChanged: {
+                        if (root.currentObject === null)
+                            oppTable.model = []
+                        else {
+                            var q = database.newOpportunityQuery()
 
-//                }
-//            }
+                            if (database.isMarket(root.currentObject.vendor))
+                                q.query.marketListing = root.currentObject
+                            else
+                                q.query.supplierListing = root.currentObject
+
+                            oppTable.model = database.getModel(q)
+                        }
+                    }
+                }
+
+                headerPositioning: ListView.OverlayHeader
+                header: Rectangle {
+                    z: 10
+                    color: Material.background
+                    height: 56
+                    width: parent.width
+
+                    RowLayout {
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        spacing: 0
+
+                        M.TinyIconButton {
+                            iconSource: "icons/add_circle.png"
+                            Layout.leftMargin: 24
+                        }
+
+                        M.Label {
+                            type: "Column Header"
+                            text: root.currentObject !== null ? database.isMarket(root.currentObject.vendor) ? "Supplier/SKU" : "Market/SKU" : "Product"
+                            Layout.preferredWidth: 200
+                            Layout.leftMargin: 24
+                        }
+
+                        M.Label {
+                            type: "Column Header"
+                            text: "Profit"
+                            horizontalAlignment: Qt.AlignRight
+                            Layout.preferredWidth: 75
+                            Layout.leftMargin: 24
+                        }
+
+                        M.Label {
+                            type: "Column Header"
+                            text: "Margin"
+                            horizontalAlignment: Qt.AlignRight
+                            Layout.preferredWidth: 75
+                            Layout.leftMargin: 24
+                        }
+
+                        M.Label {
+                            type: "Column Header"
+                            text: "ROI"
+                            horizontalAlignment: Qt.AlignRight
+                            Layout.preferredWidth: 75
+                            Layout.leftMargin: 24
+                        }
+                    }
+
+                    M.Divider {
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            bottom: parent.bottom
+                        }
+                    }
+                }
+
+                delegate: Item {
+                    id: oppDelegate
+                    width: parent.width
+                    height: 48
+
+                    property Product oppListing
+
+                    Component.onCompleted: {
+                        if (database.isMarket(root.currentObject.vendor))
+                            oppListing = database.getReferencedObject(supplierListing)
+                        else
+                            oppListing = database.getReferencedObject(marketListing)
+                    }
+
+                    RowLayout {
+                        spacing: 0
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        M.TinyIconButton {
+                            iconSource: "icons/delete.png"
+                            Layout.leftMargin: 24
+                            Layout.alignment: Qt.AlignVCenter
+                            onClicked: {
+                                var obj = oppDelegate.ListView.view.model.getObject(index)
+                                database.deleteObject(obj)
+                                oppDelegate.ListView.view.model.removeRow(index)
+                            }
+                        }
+
+                        M.LinkLabel {
+                            type: "Body 1"
+                            text: oppListing !== null ? database.getVendorName(oppListing.vendor) + " #" + oppListing.sku : ""
+                            link: oppListing !== null ? oppListing.detailPageUrl : ""
+                            elide: Text.ElideRight
+                            Layout.preferredWidth: 200
+                            Layout.leftMargin: 24
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+
+                        M.Label {
+                            type: "Body 1"
+                            text: profit !== undefined ? "$" + profit.toFixed(2) : "n/a"
+                            horizontalAlignment: Qt.AlignRight | Qt.AlignVCenter
+                            Layout.preferredWidth: 75
+                            Layout.leftMargin: 24
+                        }
+
+                        M.Label {
+                            type: "Body 1"
+                            text: margin !== undefined ? (margin * 100).toFixed(0) + "%" : "n/a"
+                            horizontalAlignment: Qt.AlignRight | Qt.AlignVCenter
+                            Layout.preferredWidth: 75
+                            Layout.leftMargin: 24
+                        }
+
+                        M.Label {
+                            type: "Body 1"
+                            text: roi !== undefined ? (roi * 100).toFixed(0) + "%": "n/a"
+                            horizontalAlignment: Qt.AlignRight | Qt.AlignVCenter
+                            Layout.preferredWidth: 75
+                            Layout.leftMargin: 24
+                        }
+                    }
+                }
+
+            }
         }
     }
 }

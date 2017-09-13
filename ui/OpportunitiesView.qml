@@ -21,18 +21,28 @@ TableBrowserView {
     queryDialog.onlyShow: "Opportunities"
     addNewButtonVisible: false
 
-    Component.onCompleted: model = database.getModel(database.newOpportunityQuery())
+    Component.onCompleted: model = database.getParentedModel(database.newOpportunityQuery(), root)
 
     columns: [
         {name: "Title", width: 450},
         {name: "Vendor", width: 125},
-        {name: "SKU", width: 100},
+        {name: "Rank", width: 100},
         {name: "Profit ($)", width: 75, alignment: Qt.AlignRight},
         {name: "Margin (%)", width: 75, alignment: Qt.AlignRight},
         {name: "ROI (%)", width: 75, alignment: Qt.AlignRight}
     ]
 
     actionOnSelectedMenu: Menu {
+        MenuItem {
+            text: "Edit market tags..."
+            onTriggered: { editTagsDialog.applyToMarkets = true; editTagsDialog.open() }
+        }
+
+        MenuItem {
+            text: "Edit supplier tags..."
+            onTriggered: { editTagsDialog.applyToMarkets = false; editTagsDialog.open() }
+        }
+
         MenuItem {
             text: "Delete..."
             onTriggered: confirmDeleteDialog.open()
@@ -64,8 +74,35 @@ TableBrowserView {
         }
     }
 
+    EditTagsDialog {
+        id: editTagsDialog
+        title: applyToMarkets ? "Edit market tags" : "Edit supplier tags"
+        property bool applyToMarkets: true
+
+        onAccepted: {
+            var obj
+            var selected = table.selectedIndices
+            for (var i=0; i<selected.length; i++) {
+                obj = applyToMarkets ? model.getObject(selected[i]).marketListing : model.getObject(selected[i].supplierListing)
+                obj = database.getReferencedObject(obj)
+                if (adding)
+                    obj.addTags(tags)
+                else
+                    obj.removeTags(tags)
+
+                database.saveObject(obj)
+            }
+            tags = []
+        }
+    }
+
     tableRowDelegate: M.TableRow {
-        onClicked: table.currentIndex = index
+        onClicked: {
+            if (root.currentObject !== null && root.currentObject.modified)
+                database.saveObject(root.currentObject)
+
+            table.currentIndex = index
+        }
         property var header: index >= 0 ? database.getProductHeader(marketListing) : null
 
         M.LinkLabel {
@@ -83,7 +120,7 @@ TableBrowserView {
 
         M.Label {
             type: "Body 1"
-            text: header !== null ? header["sku"] : "n/a"
+            text: marketListing.rank !== undefined ? marketListing.rank.toLocaleString() : "n/a"
             elide: Text.ElideRight
         }
 
@@ -106,16 +143,68 @@ TableBrowserView {
         }
     }
 
+    sideToolBar: Item {
+        Row {
+            spacing: 8
+            anchors {
+                top: parent.top
+                right: parent.right
+                margins: 8
+            }
+
+            M.IconToolButton {
+                iconSource: "../icons/remove.png"
+                enabled: root.currentObject !== null
+                onClicked: {
+                    var obj = root.currentObject
+                    model.removeRow(table.currentIndex)
+                    database.deleteObject(obj)
+                    obj.destroy()
+                    if (model.length > 0 && table.currentIndex >= model.length)
+                        table.currentIndex = model.length - 1
+                    else if (model.length > 0)
+                        root.currentObject = Qt.binding( function() { return (table.currentIndex > -1 && model !== null ? model.getObject(table.currentIndex) : null) })
+                }
+            }
+        }
+
+        M.Label {
+            anchors {
+                bottom: parent.bottom
+                horizontalCenter: parent.horizontalCenter
+                bottomMargin: 8
+            }
+            type: "Caption"
+            text: root.currentObject !== null && root.currentObject.similarityScore !== undefined ? (root.currentObject.similarityScore * 100).toFixed() + "%" : "n/a"
+        }
+    }
+
     sidePanel: Flickable {
         clip: true
         anchors.fill: parent
         contentWidth: width
-        contentHeight: oppPanel.implicitHeight
+        contentHeight: sideLayout.implicitHeight
 
-        OpportunityPanel {
-            id: oppPanel
-            currentOpp: root.currentObject
+        ColumnLayout {
+            id: sideLayout
             width: parent.width
+            spacing: 32
+
+            OpportunityPanel {
+                id: oppPanel
+                currentOpp: root.currentObject
+                Layout.fillWidth: true
+            }
+
+            M.Divider {
+                Layout.fillWidth: true
+            }
+
+            ProductHistoryChart {
+                Layout.fillWidth: true
+                Layout.preferredHeight: width / (16/9)
+                product: root.currentObject !== null && root.currentObject.marketListing.ref !== undefined ? root.currentObject.marketListing.ref : null
+            }
         }
     }
 }

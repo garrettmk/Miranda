@@ -20,7 +20,7 @@ TableBrowserView {
 
     queryDialog.onlyShow: "Vendors"
 
-    Component.onCompleted: model = database.getModel(database.newVendorQuery())
+    Component.onCompleted: model = database.getParentedModel(database.newVendorQuery(), root)
 
     EditVendorDialog {
         id: editVendorDialog

@@ -13,7 +13,8 @@ M.CenteredModalDialog {
 
     property alias product: validatorPanel.product
 
-    onAccepted: { validatorPanel.apply(); database.saveObject(product) }
+    onAccepted: { validatorPanel.apply(); database.saveObject(product); product = null }
+    onRejected: { product = null }
 
     ProductValidatorPanel {
         id: validatorPanel

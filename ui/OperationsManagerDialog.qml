@@ -80,6 +80,7 @@ M.CenteredModalDialog {
 
                 Connections {
                     target: application.operations
+                    enabled: statusLabel.visible
                     onStatusMessageChanged: {
                         statusLabel.text = application.operations.statusMessage + "\n" + statusLabel.text
                     }

@@ -27,7 +27,7 @@ Item {
     property var actionOnSelectedMenu
 
     // Components exposed to subclasses
-    property ObjectModel model
+    property alias model: table.model
     property alias table: table
     property alias addNewButton: addNewButton
     property alias addNewButtonVisible: addNewButton.visible
@@ -53,13 +53,14 @@ Item {
     QueryDialog {
         id: queryDialog
         onAccepted: {
-            if (model !== null && model !== undefined)
-                model.setParent(undefined)
+            if (currentQuery !== null) {
 
-            console.log(currentQuery)
-            model = database.getModel(currentQuery)
-            model.setParent(root)
-            queryNameLabel.text = currentQuery.name
+                if (model !== null && model !== undefined)
+                    model.setParent(undefined)
+
+                model = database.getParentedModel(currentQuery, table)
+                queryNameLabel.text = currentQuery.name
+            }
         }
     }
 
@@ -157,7 +158,6 @@ Item {
             // Table
             ListView {
                 id: table
-                model: root.model
                 anchors {
                     top: mainToolBar.bottom
                     left: parent.left

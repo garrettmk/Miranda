@@ -13,7 +13,10 @@ Item {
     function show(query) {
         if (query === null) {
             marketVendorBox.currentVendor = null
+            minMarketRankField.text = ""
+            maxMarketRankField.text = ""
             supplierVendorBox.currentVendor = null
+            minSimilarityField.text = ""
             minProfitField.text =  ""
             minMarginField.text = ""
             minROIField.text = ""
@@ -21,7 +24,10 @@ Item {
             sortDirectionBox.currentIndex = 0
         } else {
             marketVendorBox.currentVendor = query.query.marketVendor
+            minMarketRankField.text = query.query.minMarketRank !== undefined ? query.query.minMarketRank : ""
+            maxMarketRankField.text = query.query.maxMarketRank !== undefined ? query.query.maxMarketRank : ""
             supplierVendorBox.currentVendor = query.query.supplierVendor
+            minSimilarityField.text = query.query.minSimilarity !== undefined ? query.query.minSimilarity * 100 : ""
             minProfitField.text = query.query.minProfit !== undefined ? query.query.minProfit.toFixed(2) : ""
             minMarginField.text = query.query.minMargin !== undefined ? query.query.minMargin * 100 : ""
             minROIField.text = query.query.minROI !== undefined ? query.query.minROI * 100 : ""
@@ -56,6 +62,12 @@ Item {
                 return
             }
 
+            if (query.sort.marketRank !== undefined) {
+                sortByBox.currentIndex = 6
+                sortDirectionBox.currentIndex = query.sort.marketRank
+                return
+            }
+
             sortByBox.currentIndex = 0
             sortDirectionBox.currentIndex = 0
         }
@@ -64,7 +76,10 @@ Item {
     function applyTo(query) {
         if (query !== null) {
             query.query.marketVendor = marketVendorBox.currentVendor !== null && marketVendorBox.currentvendor !== undefined ? marketVendorBox.currentVendor : undefined
+            query.query.minMarketRank = minMarketRankField.text ? parseInt(minMarketRankField.text) : undefined
+            query.query.maxMarketRank = maxMarketRankField.text ? parseInt(maxMarketRankField.text) : undefined
             query.query.supplierVendor = supplierVendorBox.curentVendor !== null && supplierVendorBox.currentVendor !== undefined ? supplierVendorBox.currentVendor : undefined
+            query.query.minSimilarity = minSimilarityField.text ? parseInt(minSimilarityField.text) / 100 : undefined
             query.query.minProfit = minProfitField.text ? parseFloat(minProfitField.text) : undefined
             query.query.minMargin = minMarginField.text ? parseFloat(minMarginField.text) / 100 : undefined
             query.query.minROI   = minROIField.text ? parseFloat(minROIField.text) / 100 : undefined
@@ -83,11 +98,14 @@ Item {
                 query.sort.margin = sortDir
             else if (sortIdx === 5)
                 query.sort.roi = sortDir
+            else if (sortIdx === 6)
+                query.sort.marketRank = sortDir
         }
     }
 
     function _clear_sorts(query) {
         query.sort.marketVendor = undefined
+        query.sort.marketRank = undefined
         query.sort.supplierVendor = undefined
         query.sort.profit = undefined
         query.sort.margin = undefined
@@ -125,14 +143,42 @@ Item {
             Layout.topMargin: 24
         }
 
+        Item { Layout.preferredWidth: 1 }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 32
+
+            M.TextField {
+                id: minMarketRankField
+                labelText: "Min. Rank"
+                Layout.fillWidth: true
+            }
+
+            M.TextField {
+                id: maxMarketRankField
+                labelText: "Max. Rank"
+                Layout.fillWidth: true
+            }
+        }
+
         M.SystemIcon {
             source: "icons/vendor.png"
-            Layout.topMargin: 6
+            Layout.topMargin: 30
         }
 
         VendorComboBox {
             id: supplierVendorBox
             Layout.fillWidth: true
+            Layout.topMargin: 24
+        }
+
+        Item { Layout.preferredWidth: 1 }
+
+        M.TextField {
+            id: minSimilarityField
+            labelText: "Min. Similarity"
+            suffix: M.Label { type: "Body 1"; text: "%"; opacity: 0.5 }
         }
 
         M.SystemIcon {
@@ -182,7 +228,7 @@ Item {
 
             ComboBox {
                 id: sortByBox
-                model: ["None", "Marketplace", "Supplier", "Profit", "Margin", "ROI"]
+                model: ["None", "Marketplace", "Supplier", "Profit", "Margin", "ROI", "Market Rank"]
                 Layout.fillWidth: true
             }
 

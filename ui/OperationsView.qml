@@ -19,7 +19,7 @@ TableBrowserView {
 
     queryDialog.onlyShow: "Operations"
 
-    Component.onCompleted: model = database.getModel(database.newOperationQuery())
+    Component.onCompleted: model = database.getParentedModel(database.newOperationQuery(), root)
 
     columns: [
         {name: "Name", width: 300},
@@ -141,7 +141,7 @@ TableBrowserView {
 
         M.Label {
             type: "Body 1"
-            text: ""
+            text: repeat !== undefined ? repeat + " hours" : "No"
         }
     }
 
@@ -204,9 +204,17 @@ TableBrowserView {
                 Layout.alignment: Qt.AlignRight
             }
 
-            M.Label {
-                type: "Body 1"
-                text: enabled ? root.currentObject.scheduled.toString() : ""
+            Row {
+                spacing: 8
+                M.Label {
+                    type: "Body 1"
+                    text: enabled ? root.currentObject.scheduled.toString() : ""
+                }
+
+                M.TinyIconButton {
+                    iconSource: "icons/timer.png"
+                    onClicked: root.currentObject.scheduled = new Date()
+                }
             }
 
             M.Label {
@@ -217,12 +225,12 @@ TableBrowserView {
 
             M.Label {
                 type: "Body 1"
-                text: "(not implemented)"
+                text: enabled ? root.currentObject.repeat !== undefined ? "Every " + root.currentObject.repeat + " hours" : "No" : ""
             }
 
             M.Label {
                 type: "Body 2 Light"
-                text: "Active"
+                text: "Active:"
                 Layout.alignment: Qt.AlignRight
             }
 
@@ -240,7 +248,7 @@ TableBrowserView {
             Layout.fillHeight: true
             currentIndex: enabled ? pageNames.indexOf(root.currentObject.pythonClassName) : 0
 
-            property var pageNames: ["none", "FindMarketMatches"]
+            property var pageNames: ["none", "FindMarketMatches", "UpdateProducts", "UpdateOpportunities"]
 
             Item {
                 // Blank item when no operation is selected
@@ -262,14 +270,151 @@ TableBrowserView {
 
                     M.Label {
                         type: "Body 2 Light"
+                        text: "Completed:"
+                        Layout.alignment: Qt.AlignRight
+                    }
+
+                    M.Label {
+                        id: completionLabel
+                        type: "Body 1"
+                        Connections {
+                            target: root
+                            onCurrentObjectChanged: {
+                                if (root.currentObject !== null) {
+                                    var stamped = database.queryCount(root.currentObject.stampedQuery())
+                                    var total = database.queryCount(root.currentObject.objectQuery)
+                                    completionLabel.text = stamped.toLocaleString() + "/" + total.toLocaleString() + " (" + (stamped/total*100).toFixed(1) + "%)"
+                                } else {
+                                    completionLabel.text = ""
+                                }
+                            }
+                        }
+                    }
+
+                    M.Label {
+                        type: "Body 2 Light"
                         text: "Vendor:"
                         Layout.alignment: Qt.AlignRight
                     }
 
                     M.Label {
                         type: "Body 1"
-                        text: enabled && root.currentObject.productQuery.query.vendor !== undefined ? database.getVendorName(root.currentObject.productQuery.query.vendor) : "n/a"
+                        text: enabled && root.currentObject.objectQuery.query.vendor !== undefined ? database.getVendorName(root.currentObject.objectQuery.query.vendor) : "n/a"
                         Layout.fillWidth: true
+                    }
+                }
+            }
+
+            // UpdateProducts
+            Item {
+                GridLayout {
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        leftMargin: 24
+                        rightMargin: 24
+                    }
+
+                    columns: 2
+                    columnSpacing: 32
+
+                    M.Label {
+                        type: "Body 2 Light"
+                        text: "Tags"
+                        Layout.alignment: Qt.AlignRight
+                    }
+
+                    M.ChipEditor {
+                        readOnly: true
+                        model: enabled && root.currentObject.objectQuery.query.tags !== undefined ? root.currentObject.objectQuery.query.tags : []
+                        Layout.fillWidth: true
+                    }
+
+                    M.Label {
+                        type: "Body 2 Light"
+                        text: "Log:"
+                        Layout.alignment: Qt.AlignRight
+                    }
+
+                    M.Label {
+                        type: "Body 1"
+                        text: enabled ? root.currentObject.log ? "Yes" : "No" : "n/a"
+                    }
+                }
+            }
+
+            // UpdateOpportunities
+            Item {
+                GridLayout {
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        leftMargin: 24
+                        rightMargin: 24
+                    }
+
+                    columns: 2
+                    columnSpacing: 32
+
+                    M.Label {
+                        type: "Body 2 Light"
+                        text: "Completed:"
+                        Layout.alignment: Qt.AlignRight
+                    }
+
+                    Row {
+                        spacing: 8
+                        Layout.fillWidth: true
+
+                        M.Label {
+                            id: updateOppsCompletionLabel
+                            type: "Body 1"
+
+                            function refresh() {
+                                if (root.currentObject !== null) {
+                                    var stamped = database.queryCount(root.currentObject.stampedQuery())
+                                    var total = database.queryCount(root.currentObject.objectQuery)
+                                    updateOppsCompletionLabel.text = stamped.toLocaleString() + "/" + total.toLocaleString() + " (" + (stamped/total*100).toFixed(1) + "%)"
+                                } else {
+                                    updateOppsCompletionLabel.text = ""
+                                }
+                            }
+
+                            Connections {
+                                target: root
+                                onCurrentObjectChanged: updateOppsCompletionLabel.refresh()
+                            }
+                        }
+
+                        M.TinyIconButton {
+                            iconSource: "icons/delete.png"
+                            enabled: root.currentObject !== null
+                            onClicked: { database.clearOpLogs(root.currentObject); updateOppsCompletionLabel.refresh() }
+                        }
+                    }
+
+                    M.Label {
+                        type: "Body 2 Light"
+                        text: "Min. Rank:"
+                        Layout.alignment: Qt.AlignRight
+                    }
+
+                    M.Label {
+                        type: "Body 1"
+                        text: enabled ? root.currentObject.objectQuery.query.minMarketRank !== undefined ? root.currentObject.objectQuery.query.minMarketRank : "n/a" : ""
+                    }
+
+                    M.Label {
+                        type: "Body 2 Light"
+                        text: "Max. Rank:"
+                        Layout.alignment: Qt.AlignRight
+                    }
+
+                    M.Label {
+                        type: "Body 1"
+                        text: enabled ? root.currentObject.objectQuery.query.maxMarketRank !== undefined ? root.currentObject.objectQuery.query.maxMarketRank : "n/a" : ""
                     }
                 }
             }

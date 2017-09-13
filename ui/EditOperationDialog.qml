@@ -31,9 +31,13 @@ M.CenteredModalDialog {
                 repeatBox.currentIndex = 4
 
             if (operation.pythonClassName === "FindMarketMatches") {
-                vendorBox.currentVendor = operation.productQuery.query.vendor
+                vendorBox.currentVendor = operation.objectQuery.query.vendor
             } else if (operation.pythonClassName === "UpdateProducts") {
-                updateProductsTags.model = operation.productQuery.query.tags
+                updateProductsTags.model = operation.objectQuery.query.tags !== undefined ? operation.objectQuery.query.tags : []
+                logUpdatesSwitch.checked = operation.log
+            } else if (operation.pythonClassName === "UpdateOpportunities") {
+                oppMinMarketRankField.text = operation.objectQuery.query.minMarketRank !== undefined ? operation.objectQuery.query.minMarketRank : ""
+                oppMaxMarketRankField.text = operation.objectQuery.query.maxMarketRank !== undefined ? operation.objectQuery.query.maxMarketRank : ""
             }
 
         } else {
@@ -64,9 +68,13 @@ M.CenteredModalDialog {
 
         var kind = operation.pythonClassName
         if (kind === "FindMarketMatches") {
-            operation.productQuery.query.vendor = vendorBox.currentVendor
+            operation.objectQuery.query.vendor = vendorBox.currentVendor
         } else if (kind === "UpdateProducts") {
-            operation.productQuery.query.tags = updateProductsTags.model
+            operation.objectQuery.query.tags = updateProductsTags.model
+            operation.log = logUpdatesSwitch.checked
+        } else if (kind === "UpdateOpportunities") {
+            operation.objectQuery.query.minMarketRank = oppMinMarketRankField.text ? parseInt(oppMinMarketRankField.text) : undefined
+            operation.objectQuery.query.maxMarketRank = oppMaxMarketRankField.text ? parseInt(oppMaxMarketRankField.text) : undefined
         }
     }
 
@@ -142,7 +150,7 @@ M.CenteredModalDialog {
             Layout.topMargin: 24
             Layout.bottomMargin: 24
 
-            currentIndex: operation !== null ? ["DummyOperation", "FindMarketMatches"].indexOf(operation.pythonClassName) : 0
+            currentIndex: operation !== null ? ["DummyOperation", "FindMarketMatches", "UpdateProducts", "UpdateOpportunities"].indexOf(operation.pythonClassName) : 0
 
             // DummyOperation
             M.Label {
@@ -171,7 +179,7 @@ M.CenteredModalDialog {
 
                 M.Label {
                     type: "Body 1"
-                    text: "Tags"
+                    text: "Tags:"
                     Layout.alignment: Qt.AlignRight
                 }
 
@@ -188,15 +196,56 @@ M.CenteredModalDialog {
                 columns: 2
                 columnSpacing: 32
 
-                M.Label {
-                    type: "Body 1"
-                    text: "Update listings with tags:"
-                    Layout.alignment: Qt.AlignRight | Qt.AlignTop
+                M.SystemIcon {
+                    source: "icons/tag.png"
+                    Layout.topMargin: 0
                 }
 
                 M.ChipEditor {
                     id: updateProductsTags
                     Layout.fillWidth: true
+                }
+
+                M.SystemIcon {
+                    source: "icons/save.png"
+                    Layout.topMargin: 24
+                }
+
+                Switch {
+                    id: logUpdatesSwitch
+                    text: "Log updates"
+                    leftPadding: -4
+                    Layout.topMargin: 24
+                }
+            }
+
+            // UpdateOpportunities
+            GridLayout {
+                anchors.top: parent.top
+                width: parent.width
+                columns: 2
+                columnSpacing: 32
+
+                M.SystemIcon {
+                    source: "icons/rank.png"
+                    Layout.topMargin: 30
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 32
+
+                    M.TextField {
+                        id: oppMinMarketRankField
+                        labelText: "Min. Rank"
+                        Layout.fillWidth: true
+                    }
+
+                    M.TextField {
+                        id: oppMaxMarketRankField
+                        labelText: "Max. Rank"
+                        Layout.fillWidth: true
+                    }
                 }
             }
         }

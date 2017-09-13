@@ -72,6 +72,7 @@ class AmazonThrottledQueueAPI(API):
         self._replies = {}
         self._retries = {}
         self._wait_on_retry = 5000
+        self._lambdas = {}
 
     def next_api_call(self, action):
         """Convenience method, returns the APICall object for the next request of type :action:."""
@@ -121,22 +122,30 @@ class AmazonThrottledQueueAPI(API):
         parameters = api_call.parameters or {}
 
         self._replies[action] = self.make_request(action, **parameters)
-        self._replies[action].finished.connect(lambda action=action: self._process_api_response(action))
+
+        if action not in self._lambdas:
+            self._lambdas[action] = lambda a=action: self._process_api_response(a)
+
+        self._replies[action].finished.connect(self._lambdas[action])
 
     def _process_api_response(self, action):
         """Receives the finished() signal for the current network request, and finishes processing the api call"""
-        api_call = self._deques[action][0]
+        try:
+            api_call = self._deques[action][0]
+        except:
+            print('bad')
         reply = self._replies[action]
+        reply.finished.disconnect(self._lambdas[action])
         error = reply.error()
 
         if error == QtNetwork.QNetworkReply.NoError:
             pass
         elif error in [QtNetwork.QNetworkReply.ServiceUnavailableError,
-                       QtNetwork.QNetworkReply.UnknownNetworkError]:
+                       QtNetwork.QNetworkReply.UnknownNetworkError,
+                       QtNetwork.QNetworkReply.UnknownServerError]:
             # This pretty much always means the request was throttled
             if self._retries.get(action, 0) < 2:
                 self._retries[action] = self._retries.get(action, 0) + 1
-                print(f'Throttled ({action}), retry {self._retries[action]}')
                 self.processNext(action)
                 return
             else:

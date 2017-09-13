@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta, timezone
 from tzlocal import get_localzone
 from PyQt5 import QtCore, QtNetwork
-from queries import ObjectQuery, ProductQueryDocument, ProductSortDocument
-from models import Product, ProfitRelationship, MarketLink, SupplierLink
-from apis import ListMatchingProducts, GetMatchingProductForId, GetCompetitivePricingForASIN, GetMyFeesEstimate, ItemLookup
+from queries import *
+from models import *
+from apis import *
 from productvalidator import PriceValidator, QuantityValidator
 import cupi as qp
+import sip
 
 
 ########################################################################################################################
@@ -55,47 +56,102 @@ class DummyOperation(Operation):
 ########################################################################################################################
 
 
-class ProductOperation(Operation):
-    """An operation that acts on a group of products, designated by a ProductQuery."""
+class ObjectOperation(Operation):
+    """A base class for operations that iterate through a query of objects."""
 
-    productQueryChanged = QtCore.pyqtSignal()
-    productQuery = qp.MapObjectProperty('product_query',
-                                        _type=ObjectQuery,
-                                        notify=productQueryChanged,
-                                        default=lambda s: ObjectQuery(objectType='Product',
-                                                                      query=ProductQueryDocument(),
-                                                                      sort=ProductSortDocument()))
+    objectQueryChanged = QtCore.pyqtSignal()
+    objectQuery = qp.MapObjectProperty('object_query',
+                                       _type=ObjectQuery,
+                                       notify=objectQueryChanged,
+                                       default=lambda s: s.default_query())
 
-    def get_next_product(self):
-        """Returns the next product given by productQuery that has not been stamped."""
-        unstamped = {'operation_log.operation_id': {'$nin': [self._id]}}
-        query_copy = qp.MapObject.from_document(self.productQuery.current_document)
-        query_copy.query.update(unstamped)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.current_object = None
 
-        prod = self.application.database.get_object(query_copy)
-        if prod is not None:
-            self.application.database.get_referenced_object(prod.vendor)
+    @staticmethod
+    def default_query():
+        """Returns an ObjectQuery to use as the default query. Meant to be overridden by subclasses."""
+        raise NotImplementedError
 
-        return prod
+    def stamped_query(self):
+        """Returns a copy of objectQuery, modified to only return stamped objects."""
+        stamped = {
+            'operation_log.operation_id': {
+                '$in': [self._id]
+            }
+        }
 
-    def stamp_product(self, product, succeeded, message=None):
-        """Places an entry in the product's operation_log, indicating whether the operation succeeded and providing
-        additional information in message."""
-        stamp = {'operation_id': self._id,
-                 'succeeded': succeeded,
-                 'message': message}
-        product.operationLog.append(stamp)
-        self.application.database.saveObject(product)
+        q_copy = qp.MapObject.from_document(self.objectQuery.current_document)
+        q_copy.query.update(stamped)
+        return q_copy
+
+    def unstamped_query(self):
+        """Returns a copy of objectQuery, modified to only return unstamped objects."""
+        unstamped = {
+            'operation_log.operation_id': {
+                '$nin': [self._id]
+            }
+        }
+
+        q_copy = qp.MapObject.from_document(self.objectQuery.current_document)
+        q_copy.query.update(unstamped)
+        return q_copy
+
+    @QtCore.pyqtSlot(result=ObjectQuery)
+    def stampedQuery(self):
+        q = self.stamped_query()
+        sip.transferto(q, q)
+        return q
+
+    @QtCore.pyqtSlot(result=ObjectQuery)
+    def unstampedQuery(self):
+        q = self.unstamped_query()
+        sip.transferto(q, q)
+        return q
+
+    def get_next_object(self):
+        query = self.unstamped_query()
+        obj = self.application.database.get_object(query, parent=self)
+        self.current_object = obj
+        return obj
+
+    def stamp_object(self, object, succeeded, message=None):
+        """Places an entry in the object's operations_log, indicating whether the operation was successfull
+        and providing any additional information in the message."""
+        stamp = {
+            'operation_id': self._id,
+            'succeeded': succeeded,
+            'message': message
+        }
+
+        if 'operation_log' not in object:
+            object['operation_log'] = []
+
+        object['operation_log'].append(stamp)
+        self.application.database.saveObject(object)
+
+    def finish(self):
+        if self.current_object is not None:
+            self.current_object.deleteLater()
+
+        self.current_object = None
+        self.finished.emit()
 
 
 ########################################################################################################################
 
 
-class FindMarketMatches(ProductOperation):
+class FindMarketMatches(ObjectOperation):
+
+    @staticmethod
+    def default_query():
+        return ObjectQuery(objectType='Product',
+                           query=ProductQueryDocument(),
+                           sort=ProductSortDocument())
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._vendor_product = None
         self._matched_products = {}
         self._lmp_call = None
         self._gcp_call = None
@@ -103,19 +159,18 @@ class FindMarketMatches(ProductOperation):
         self._gfe_call = None
 
     def start(self):
-        self._matched_products = {}
-        self._vendor_product = self.get_next_product()
-        if self._vendor_product is None:
+        product = self.get_next_object()
+        if product is None:
             self.active = False
-            self.finished.emit()
+            self.finish()
             return
         else:
-            self._vendor_product.setParent(self)
+            self.application.database.get_referenced_object(product.vendor)
 
-        if self._vendor_product.brand and self._vendor_product.model:
-            query_str = self._vendor_product.brand + ' ' + self._vendor_product.model
+        if product.brand and product.model:
+            query_str = product.brand + ' ' + product.model
         else:
-            query_str = self._vendor_product.title
+            query_str = product.title
 
         self._lmp_call = ListMatchingProducts(query=query_str)
         self._lmp_call.finished.connect(self._parse_lmp_call)
@@ -125,14 +180,12 @@ class FindMarketMatches(ProductOperation):
         self._lmp_call = None
         self._gcp_call = None
         self._lookup_call = None
-        if self._vendor_product is not None:
-            self._vendor_product.setParent(None)
-            self._vendor_product = None
-        self.finished.emit()
+        self._matched_products = {}
+        super().finish()
 
     def _parse_lmp_call(self):
         if not self._lmp_call.succeeded:
-            self.stamp_product(self._vendor_product, False, self._lmp_call.errorMessage)
+            self.stamp_object(self.current_object, False, self._lmp_call.errorMessage)
             self.finish()
             return
 
@@ -148,14 +201,14 @@ class FindMarketMatches(ProductOperation):
             self._gcp_call.finished.connect(self._parse_gcp_call)
             self.application.amazonMWS.enqueue(self._gcp_call)
         else:
-            self.stamp_product(self._vendor_product, True)
+            self.stamp_object(self.current_object, True)
             self.finish()
 
     def _parse_gcp_call(self):
-        if not self._gcp_call.succeeded:
-            return
-
         for price_group in self._gcp_call.prices:
+            if 'error' in price_group:
+                continue
+
             sku = price_group['sku']
             landed_price = price_group.get('landed_price', None)
             listing_price = price_group.get('listing_price', None)
@@ -177,7 +230,7 @@ class FindMarketMatches(ProductOperation):
 
     def _parse_lookup_call(self):
         if not self._lookup_call.succeeded:
-            self.stamp_product(self._vendor_product, False, self._lookup_call.errorMessage)
+            self.stamp_object(self.current_object, False, self._lookup_call.errorMessage)
             self.finish()
             return
 
@@ -194,7 +247,7 @@ class FindMarketMatches(ProductOperation):
 
         asins = [key for key, value in self._matched_products.items() if value.get('price', None)]
         if not asins:
-            self.stamp_product(self._vendor_product, False, "No valid matches found.")
+            self.stamp_object(self.current_object, False, "No valid matches found.")
             self.finish()
             return
 
@@ -219,12 +272,13 @@ class FindMarketMatches(ProductOperation):
         quant_validator = db.new_quantity_validator(always_apply=True)
         amazon = db.get_object(db.new_vendor_query(query={'title': 'Amazon'}), parent=self)
 
-        for match in self._matched_products.values():
+        for asin, match in self._matched_products.items():
             # Check if the product is already in the database
-            existing_query = db.new_product_query(query={'vendor': amazon, 'sku': match['sku']})
+            existing_query = db.new_product_query(query={'vendor': amazon, 'sku': asin})
+
             matched_product = db.get_object(existing_query)
             if matched_product is None:
-                matched_product = Product(vendor=qp.MapObjectReference(ref=amazon), sku=match['sku'])
+                matched_product = Product(vendor=qp.MapObjectReference(ref=amazon), sku=asin)
 
             # Update the product in the database
             matched_product.update(match)
@@ -236,61 +290,130 @@ class FindMarketMatches(ProductOperation):
 
             # Update or create a profit relationship
             rel = db.get_object(db.new_opportunity_query(query={'marketListing': matched_product,
-                                                                 'supplierListing': self._vendor_product}))
+                                                                 'supplierListing': self.current_object}))
 
             rel = rel if rel is not None else ProfitRelationship()
             rel.marketListing.ref = matched_product
-            rel.supplierListing.ref = self._vendor_product
+            rel.supplierListing.ref = self.current_object
             rel.refresh()
             db.saveObject(rel)
 
-        self.stamp_product(self._vendor_product, True)
+        self.stamp_object(self.current_object, True)
         self.finish()
 
 
 ########################################################################################################################
 
 
-class UpdateProducts(ProductOperation):
+class UpdateProducts(ObjectOperation):
+
+    logChanged = QtCore.pyqtSignal()
+    log = qp.Property('log', _type=bool, default=False, notify=logChanged)
+
+    @staticmethod
+    def default_query():
+        return ObjectQuery(objectType='Product',
+                           query=ProductQueryDocument(),
+                           sort=ProductSortDocument())
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._current_product = None
         self._update = None
         self._lookup_call = None
         self._get_pricing_call = None
 
     def start(self):
-        product = self.get_next_product()
+        product = self.get_next_object()
         if product is None:
             self.active = False
             self.finish()
             return
         elif not product.sku:
-            self.stamp_product(product, succeeded=False, message='SKU required')
+            self.stamp_object(product, succeeded=False, message='SKU required')
             self.finish()
 
         self._get_pricing_call = GetCompetitivePricingForASIN(asins=[product.sku])
         self._get_pricing_call.finished.connect(self._parse_get_pricing)
         self.application.amazonMWS.enqueue(self._get_pricing_call)
 
+    def finish(self):
+        self._update = None
+        self._lookup_call = None
+        self._get_pricing_call = None
+        super().finish()
+
     def _parse_get_pricing(self):
         if self._get_pricing_call.succeeded:
-            self._get_pricing_call.update_product(self._current_product)
+            self._get_pricing_call.update_product(self.current_object)
 
-        self._lookup_call = ItemLookup(asins=[self._current_product.sku])
+        self._lookup_call = ItemLookup(asins=[self.current_object.sku])
         self._lookup_call.finished.connect(self._parse_lookup)
         self.application.amazonPA.enqueue(self._lookup_call)
 
     def _parse_lookup(self):
         if not self._lookup_call.succeeded:
-            self.stamp_product(self._current_product, succeeded=False, message=self._lookup_call.errorMessage)
+            self.stamp_object(self.current_object, succeeded=False, message=self._lookup_call.errorMessage)
             self.finish()
             return
 
-        self._lookup_call.update_product(self._current_product, except_price=True)
-        self.stamp_product(self._current_product, succeeded=True)
+        self._lookup_call.update_product(self.current_object, except_price=True)
+
+        if self.log:
+            q = self.application.database.new_product_history_query(query={'product': self.current_object})
+            history = self.application.database.get_object(q)
+            if history is None:
+                history = ProductHistory(product=qp.MapObjectReference(ref=self.current_object))
+            history.add_to_history(self.current_object)
+            self.application.database.saveObject(history)
+
+        self.stamp_object(self.current_object, succeeded=True)
         self.finish()
+
+
+########################################################################################################################
+
+
+class UpdateOpportunities(ObjectOperation):
+
+    @staticmethod
+    def default_query():
+        return ObjectQuery(objectType='ProfitRelationship',
+                           query=OpportunityQueryDocument(),
+                           sort=OpportunitySortDocument())
+
+    def start(self):
+        opp = self.get_next_object()
+        if opp is None:
+            self.active = False
+            self.finish()
+            return
+
+        db = self.application.database
+        if db.get_referenced_object(opp.marketListing) is None\
+            or db.get_referenced_object(opp.supplierListing) is None:
+            self.stamp_object(opp, succeeded=False, message='marketListing or supplierListing not found.')
+            self.finish()
+            return
+
+        db.get_referenced_object(opp.marketListing.ref.vendor)
+        db.get_referenced_object(opp.supplierListing.ref.vendor)
+
+        price_validator = PriceValidator(always_apply=True)
+        quant_validator = db.new_quantity_validator(always_apply=True)
+
+        for listing in (opp.marketListing.ref, opp.supplierListing.ref):
+            price_validator.product = listing
+            quant_validator.product = listing
+            price_validator.apply()
+            quant_validator.apply()
+
+        opp.refresh()
+        db.saveObject(opp)
+        self.stamp_object(opp, succeeded=True)
+        self.finish()
+
+
+
 
 
 ########################################################################################################################
@@ -312,8 +435,6 @@ class OperationsManager(QtCore.QObject):
     @QtCore.pyqtSlot(str)
     def processNext(self, kind=None):
         """Process the next operation of type :kind:, or all operations of kind=None."""
-        self.set_status_message(f'processNext({kind})')
-
         kinds = [t.__name__ for t in Operation.subclasses()] if kind is None else [kind]
         kinds = [k for k in kinds if self._timers.get(k, None) is None]
 
@@ -321,6 +442,8 @@ class OperationsManager(QtCore.QObject):
             query = self._db.new_operation_query(query={'active': True},
                                                  sort={'scheduled': QtCore.Qt.AscendingOrder})
             query.objectType = kind
+            query.includeSubclasses = False
+
             op = self._db.get_object(query)
             if op is None:
                 continue
@@ -345,17 +468,17 @@ class OperationsManager(QtCore.QObject):
             self._lambdas[kind] = lambda k=kind: self.on_op_finished(k)
         op.finished.connect(self._lambdas[kind])
 
-        self.set_status_message(f'{kind}: {op.name}')
+        self.set_status_message(f'{datetime.now(tz=get_localzone())} {kind}: {op.name}...')
         op.start()
 
     def on_op_finished(self, kind):
-        self.set_status_message(f'on_op_finished({kind})')
         op = self._ops[kind]
 
         op.application = None
         op.finished.disconnect(self._lambdas[kind])
 
         if not op.active and op.repeat:
+            self._db.clear_op_logs(op)
             op.scheduled = datetime.now(tz=timezone.utc) + timedelta(hours=op.repeat)
             op.active = True
 
@@ -404,5 +527,10 @@ class OperationsManager(QtCore.QObject):
         self.set_status_message('Starting...')
         self.set_running(True)
         self.processNext()
+
+
+########################################################################################################################
+
+
 
 

@@ -7,7 +7,7 @@ import "." as M
 
 Item {
     id: root
-    width: parent.width //layout.implicitWidth + layout.anchors.leftMargin + layout.anchors.rightMargin
+    width: parent.width
     height: 48
 
     default property alias fields: layout.children

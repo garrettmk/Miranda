@@ -35,6 +35,10 @@ Item {
                 _marketListing.marketFees = total
                 editMarketFeesLabel.editTextField.text = total.toFixed(2)
                 database.saveObject(_marketListing)
+                database.saveObject(currentOpp)
+            } else {
+                messageDialog.text = errorMessage
+                messageDialog.open()
             }
         }
     }
@@ -50,18 +54,36 @@ Item {
             database.saveObject(currentOpp)
     }
 
+    M.CenteredModalDialog {
+        id: messageDialog
+        standardButtons: Dialog.Ok
+
+        property alias text: textLabel.text
+
+        M.Label {
+            id: textLabel
+            type: "Body 1"
+        }
+    }
+
     ProductValidatorDialog {
         id: validateProductDialog
+        onAccepted: { database.saveObject(currentOpp) }
     }
 
     EditProductDialog {
         id: editProductDialog
         onAccepted: {
-            if (product !== null && product !== undefined)
-                database.saveObject(product)
+            database.saveObject(product)
+            database.saveObject(currentOpp)
             product = null
         }
         onRejected: product = null
+    }
+
+    ObjectDocumentDialog {
+        id: documentViewerDialog
+        onAccepted: documentViewerDialog.currentObject = null
     }
 
     // Body
@@ -78,12 +100,12 @@ Item {
             ColumnLayout {
                 Layout.alignment: Qt.AlignTop
                 Layout.preferredWidth: layout.width / 2 - 1
-                spacing: 0
+                spacing: 16
 
                 M.ProductImage {
                     Layout.fillWidth: true
                     Layout.preferredHeight: width //(width * 2 + 1) / (16/9)
-                    source: _marketListing !== null ? _marketListing.imageUrl : ""
+                    source: _marketListing !== null && _marketListing.imageUrl !== undefined ? _marketListing.imageUrl : ""
 
                     Row {
                         spacing: 8
@@ -110,6 +132,15 @@ Item {
                                 validateProductDialog.open()
                             }
                         }
+
+                        M.TinyIconButton {
+                            Material.theme: Material.Light
+                            iconSource: "icons/code_dark.png"
+                            onClicked: {
+                                documentViewerDialog.currentObject = _marketListing
+                                documentViewerDialog.open()
+                            }
+                        }
                     }
                 }
 
@@ -121,12 +152,15 @@ Item {
                     wrapMode: Text.Wrap
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
-                    Layout.margins: 16
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
                     Layout.preferredHeight: Math.max(supplierTitleLabel.implicitHeight, marketTitleLabel.implicitHeight)
                 }
 
                 Column {
                     Layout.fillWidth: true
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
                     spacing: 4
 
                     M.Label {
@@ -134,6 +168,7 @@ Item {
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         text: _marketListing !== null ? database.getVendorName(_marketListing.vendor) + " " + _marketListing.sku : ""
+                        wrapMode: Text.Wrap
                     }
 
                     M.Label {
@@ -141,6 +176,7 @@ Item {
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         text: _marketListing !== null ? (_marketListing.rank !== undefined ? _marketListing.rank.toLocaleString() : "n/a") + " in " + (_marketListing.category !== undefined ? _marketListing.category : "n/a") : ""
+                        wrapMode: Text.Wrap
                     }
                 }
 
@@ -148,14 +184,18 @@ Item {
                 M.Label {
                     type: "Body 1"
                     text: _marketListing !== null ? _marketListing.brand + " " + _marketListing.model : ""
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 16
+                    wrapMode: Text.Wrap
+                    horizontalAlignment: Text.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
                 }
 
                 ColumnLayout {
                     spacing: 4
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 16
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
 
                     M.Label {
                         type: "Body 2"
@@ -172,6 +212,7 @@ Item {
             }
 
             M.Divider {
+                id: columnDivider
                 orientation: Qt.Vertical
                 Layout.fillHeight: true
             }
@@ -180,7 +221,7 @@ Item {
             ColumnLayout {
                 Layout.alignment: Qt.AlignTop
                 Layout.preferredWidth: layout.width / 2 - 1
-                spacing: 0
+                spacing: 16
 
                 M.ProductImage {
                     Layout.fillWidth: true
@@ -212,6 +253,15 @@ Item {
                                 validateProductDialog.open()
                             }
                         }
+
+                        M.TinyIconButton {
+                            Material.theme: Material.Light
+                            iconSource: "icons/code_dark.png"
+                            onClicked: {
+                                documentViewerDialog.currentObject = _supplierListing
+                                documentViewerDialog.open()
+                            }
+                        }
                     }
                 }
 
@@ -222,13 +272,16 @@ Item {
                     link: _supplierListing !== null ? _supplierListing.detailPageUrl : ""
                     wrapMode: Text.Wrap
                     Layout.fillWidth: true
-                    Layout.margins: 16
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
                     Layout.preferredHeight: Math.max(supplierTitleLabel.implicitHeight, marketTitleLabel.implicitHeight)
                     horizontalAlignment: Text.AlignHCenter
                 }
 
                 Column {
                     Layout.fillWidth: true
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
                     spacing: 4
 
                     M.Label {
@@ -251,14 +304,18 @@ Item {
                 M.Label {
                     type: "Body 1"
                     text: _supplierListing !== null ? _supplierListing.brand + " " + _supplierListing.model : ""
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 16
+                    wrapMode: Text.Wrap
+                    horizontalAlignment: Text.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
                 }
 
                 ColumnLayout {
                     spacing: 4
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 16
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
 
                     M.Label {
                         type: "Body 2"
@@ -313,7 +370,11 @@ Item {
                         text: _marketListing !== null ? _marketListing.price : ""
                         editTextField.labelText: "Sale Price"
                         Layout.preferredWidth: 100
-                        onEditAccepted: _marketListing.price = parseFloat(editTextField.text)
+                        onEditAccepted: {
+                            _marketListing.price = parseFloat(editTextField.text)
+                            database.saveObject(_marketListing)
+                            database.saveObject(currentOpp)
+                        }
                     }
 
                     M.Label {
@@ -335,7 +396,11 @@ Item {
                                 application.amazonMWS.enqueue(getMyFeesEstimate)
                             }
                         }
-                        onEditAccepted: _marketListing.marketFees = parseFloat(editTextField.text)
+                        onEditAccepted: {
+                            _marketListing.marketFees = parseFloat(editTextField.text)
+                            database.saveObject(_marketListing)
+                            database.saveObject(currentOpp)
+                        }
                     }
 
                     Item { width: 1 }
@@ -368,7 +433,7 @@ Item {
                         id: editMarketQuantityLabel
                         type: "Body 1"
                         enabled: currentOpp !== null
-                        text: enabled && _marketListing.quantity !== undefined ? _marketListing.quantity : "n/a"
+                        text: _marketListing !== null ? _marketListing.quantity !== undefined ? _marketListing.quantity : "n/a" : ""
                         Layout.preferredWidth: editMarketPriceLabel.width
                         horizontalAlignment: Text.AlignRight
 
@@ -384,7 +449,11 @@ Item {
                             editMarketQuantityField.focus = true
                         }
 
-                        onEditAccepted: _marketListing.quantity = parseInt(editMarketQuantityField.text)
+                        onEditAccepted: {
+                            _marketListing.quantity = parseInt(editMarketQuantityField.text)
+                            database.saveObject(_marketListing)
+                            database.saveObject(currentOpp)
+                        }
                     }
                 }
             }
@@ -445,6 +514,8 @@ Item {
                         onEditAccepted: {
                             _supplierListing.price = parseFloat(editSupplierPriceField.text)
                             _supplierListing.quantity = parseInt(editSupplierQuantityField.text)
+                            database.saveObject(_supplierListing)
+                            database.saveObject(currentOpp)
                         }
 
                     }
@@ -456,7 +527,7 @@ Item {
                     }
 
                     M.AffixedLabel {
-                        text: _supplierListing !== null ? _marketListing.quantity !== undefined ? _marketListing.quantity : "n/a" : ""
+                        text: _supplierListing !== null ? _supplierListing.quantity !== undefined ? _supplierListing.quantity : "n/a" : ""
                         Layout.preferredWidth: editMarketPriceLabel.width
                         prefix: M.Label { type: "Body 1"; text: "×"; opacity: 0.5}
                         rightPadding: 18 + 16
@@ -522,7 +593,7 @@ Item {
 
         M.Divider {
             Layout.fillWidth: true
-            Layout.margins: 32
+            Layout.margins: 24
         }
 
         GridLayout {

@@ -21,50 +21,37 @@ M.CenteredModalDialog {
     }
 
     property ObjectQuery currentQuery
-    property var _currentBuilder
+    property var _currentBuilder: builderStack.children[builderStack.currentIndex]
 
-    onCurrentQueryChanged: { console.log(currentQuery); _currentBuilder.show(currentQuery) }
-
+    onCurrentQueryChanged: { _currentBuilder.show(currentQuery); queryNameField.text = currentQuery.name }
     onAccepted: _currentBuilder.applyTo(currentQuery)
 
     Component.onCompleted: {
-        var idx
         if (onlyShow) {
-            idx = typeBox.model.indexOf(onlyShow)
-            typeBox.visible = false
-        } else
-            idx = 0
-
-        typeBox.currentIndex = idx
-//        loadSavedQueries()
-//        savedList.currentIndex = 0
+            typeBox.currentIndex = typeBox.model.indexOf(onlyShow)
+        }
+        loadSavedQueries()
     }
 
     function loadSavedQueries() {
-        console.log("loadSavedQueries")
-        var ot
+        var kind
         var idx = typeBox.currentIndex
 
         if (idx === 0)
-            ot = "Product"
+            kind = "Product"
         else if (idx === 1)
-            ot = "Vendor"
+            kind = "Vendor"
         else if (idx === 2)
-            ot = "ProfitRelationship"
+            kind = "ProfitRelationship"
         else if (idx === 3)
-            ot = "Operation"
+            kind = "Operation"
 
-        console.log(ot)
-        queryQuery.query.objectType = ot
+        queryQuery.query.objectType = kind
 
         var oldModel = savedList.model
-        console.log("oldModel: " + oldModel)
+        savedList.model = database.getParentedModel(queryQuery, savedList)
         if (oldModel !== undefined && oldModel !== null)
             oldModel.destroy()
-
-        console.log("getting query model")
-        savedList.model = database.getModel(queryQuery)
-        savedList.model.setParent(savedList)
 
         if (savedList.model.length)
             savedList.currentIndex = 0
@@ -112,15 +99,7 @@ M.CenteredModalDialog {
                 clip: true
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-
-                onCurrentIndexChanged: {
-                    console.log(currentIndex, model)
-                    if (savedList.currentIndex > -1) {
-                        console.log("Getting object...")
-                        root.currentQuery = model.getObject(currentIndex)
-                    } else
-                        root.currentQuery = null
-                }
+                onCurrentIndexChanged: currentIndex > -1 ? root.currentQuery = savedList.model.getObject(currentIndex) : null
 
                 delegate: Item {
                     width: parent.width
@@ -188,6 +167,7 @@ M.CenteredModalDialog {
 
                         savedList.model.append(q)
                         savedList.currentIndex = savedList.model.length - 1
+                        queryNameField.focus = true
                     }
                 }
 
@@ -195,7 +175,7 @@ M.CenteredModalDialog {
                     text: "Save"
                     flat: true
                     enabled: currentQuery !== null && currentQuery !== undefined
-                    onClicked: database.saveObject(currentQuery)
+                    onClicked: { _currentBuilder.applyTo(currentQuery); database.saveObject(currentQuery) }
                 }
 
                 Button {
@@ -206,7 +186,7 @@ M.CenteredModalDialog {
                         var row = savedList.currentIndex
                         database.deleteObject(currentQuery)
                         savedList.model.removeRow(row)
-                        savedList.currentIndex -= 1
+                        savedList.currentIndex = -1
                     }
                 }
             }
@@ -242,14 +222,9 @@ M.CenteredModalDialog {
                     id: queryNameField
                     enabled: currentQuery !== null
                     labelText: "Query name"
-                    text: enabled ? currentQuery.name : "n/a"
                     Layout.leftMargin: 32
                     Layout.fillWidth: true
-                    onEditingFinished: {
-                        if (text)
-                            currentQuery.name = text
-                        text = Qt.binding(function () {if (currentQuery !== null) return currentQuery.name; else return "n/a"})
-                    }
+                    onAccepted: currentQuery.name = text
                 }
             }
 
@@ -257,7 +232,6 @@ M.CenteredModalDialog {
             StackLayout {
                 id: builderStack
                 currentIndex: typeBox.currentIndex
-                onCurrentIndexChanged: root._currentBuilder = children[currentIndex]
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.topMargin: 24

@@ -31,7 +31,7 @@ Item {
     TextMetrics {
         id: textMetrics
         font.pointSize: textField.font.pointSize
-        text: textField.text ? textField.text : textField.placeholderText
+        text: textField.text ? textField.text : textField.labelText
     }
 
     // Body
@@ -50,12 +50,13 @@ Item {
             }
         }
 
-        TextField {
+        M.TextField {
             id: textField
-            placeholderText: "Add tags"
+            labelText: "Add tag"
             visible: !editor.readOnly
+            topPadding: 6
             implicitWidth: textMetrics.width + 16
-            onEditingFinished: {
+            onAccepted: {
                 var trimmed_text = text.trim()
                 if (trimmed_text !== "") {
                     editor.addChip(trimmed_text)

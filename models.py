@@ -3,7 +3,11 @@ from PyQt5 import QtQml
 
 import cupi as qp
 import re
+from fuzzywuzzy import fuzz
 from lxml import etree
+from datetime import datetime, timezone
+from tzlocal import get_localzone
+
 
 ########################################################################################################################
 
@@ -142,6 +146,9 @@ class SupplierLink(qp.MapObjectReference):
     quantityChanged = qtc.pyqtSignal()
     quantity = qp.Property('quantity', default=None, notify=quantityChanged)
 
+    rankChanged = qtc.pyqtSignal()
+    rank = qp.Property('rank', default=None, notify=rankChanged)
+
     shipRateChanged = qtc.pyqtSignal()
     shipRate = qp.Property('ship_rate', default=None, notify=shipRateChanged)
 
@@ -149,13 +156,21 @@ class SupplierLink(qp.MapObjectReference):
     vendorId = qp.Property('vendor_id', default=None, notify=vendorIdChanged)
 
     def set_ref(self, obj):
+        if self.ref is not None:
+            self.ref.vendor.refChanged.disconnect(self._set_ship_rate)
+
         super().set_ref(obj)
+
         if obj is not None:
             self.vendorId = obj.vendor.referentId
-            if obj.vendor.ref is not None:
-                self.shipRate = obj.vendor.ref.shippingRate
+            self._set_ship_rate()
+            obj.vendor.refChanged.connect(self._set_ship_rate)
         else:
             self.vendorId = None
+
+    def _set_ship_rate(self):
+        if self.ref is not None and self.ref.vendor.ref is not None:
+            self.shipRate = self.ref.vendor.ref.shippingRate
 
 
 ########################################################################################################################
@@ -170,6 +185,9 @@ class MarketLink(qp.MapObjectReference):
 
     quantityChanged = qtc.pyqtSignal()
     quantity = qp.Property('quantity', default=None, notify=quantityChanged)
+
+    rankChanged = qtc.pyqtSignal()
+    rank = qp.Property('rank', default=None, notify=rankChanged)
 
     marketFeesChanged = qtc.pyqtSignal()
     marketFees = qp.Property('market_fees', default=None, notify=marketFeesChanged)
@@ -207,6 +225,9 @@ class ProfitRelationship(qp.MapObject):
     roiChanged = qtc.pyqtSignal()
     roi = qp.Property('roi', default=None, notify=roiChanged)
 
+    similarityScoreChanged = qtc.pyqtSignal()
+    similarityScore = qp.Property('similarity_score', default=None, notify=similarityScoreChanged, read_only=True)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.marketListing.priceChanged.connect(self.refresh)
@@ -235,6 +256,8 @@ class ProfitRelationship(qp.MapObject):
         return True
 
     def refresh(self):
+        self._refresh_similarity()
+
         if not self._all_data_is_valid():
             self.profit = None
             self.margin = None
@@ -265,6 +288,63 @@ class ProfitRelationship(qp.MapObject):
         self.subtotalChanged.emit()
         self.estShippingChanged.emit()
         self.estCOGSChanged.emit()
+
+    def _refresh_similarity(self):
+        if self.marketListing.ref is None\
+                or self.supplierListing.ref is None:
+            return
+
+        def remove_symbols(s):
+            return re.sub(r'[^a-zA-Z0-9 ]', '', s)
+
+        def average_partial_ratio(s1, s2):
+            sims = (
+                fuzz.partial_ratio(s1, s2),
+                fuzz.partial_ratio(s2, s1)
+            )
+            return sum(sims)/len(sims)
+
+        market = self.marketListing.ref
+        supplier = self.supplierListing.ref
+        scores = []
+
+        brand_m = remove_symbols(market.brand.lower().strip()) if isinstance(market.brand, str) else None
+        brand_s = remove_symbols(supplier.brand.lower().strip()) if isinstance(supplier.brand, str) else None
+
+        model_m = remove_symbols(market.model.lower().strip()) if isinstance(market.model, str) else None
+        model_s = remove_symbols(supplier.model.lower().strip()) if isinstance(supplier.model, str) else None
+
+        title_m = remove_symbols(market.title.lower().strip()) if isinstance(market.title, str) else None
+        title_s = remove_symbols(supplier.title.lower().strip()) if isinstance(supplier.title, str) else None
+
+        brand_scores = []
+        if brand_m and brand_s:
+            brand_scores.append(average_partial_ratio(brand_m, brand_s))
+        elif brand_m and title_s:
+            brand_scores.append(fuzz.partial_ratio(brand_m, title_s))
+        elif brand_s and title_m:
+            brand_scores.append(fuzz.partial_ratio(brand_s, title_m))
+
+        if brand_scores:
+            scores.append(max(brand_scores))
+
+        model_scores = []
+        if model_m and model_s:
+            model_scores.append(average_partial_ratio(model_m, model_s))
+        elif model_m and title_s:
+            model_scores.append(fuzz.partial_ratio(model_m, title_s))
+        elif model_s and title_m:
+            model_scores.append(fuzz.partial_ratio(model_s, title_m))
+
+        if model_scores:
+            scores.extend((max(model_scores), max(model_scores)))
+
+        if title_m and title_s:
+            scores.append(fuzz.token_set_ratio(title_m, title_s))
+
+        self['similarity_score'] = sum(scores) / len(scores) / 100 if scores else None
+        self.similarityScoreChanged.emit()
+
 
     revenueChanged = qtc.pyqtSignal()
     @qtc.pyqtProperty(qtc.QVariant, notify=revenueChanged)
@@ -418,9 +498,14 @@ class ListMatchingProducts(AmazonMWSCall):
 
     def parse_response(self):
         xml = self.remove_namespaces(self.rawResponse)
-        tree = etree.fromstring(xml)
         xpath_get = AmazonMWSCall.xpath_get
         products = []
+        try:
+            tree = etree.fromstring(xml)
+        except Exception as e:
+            self.errorMessage = str(e)
+            self.succeeded = False
+            return
 
         if tree.xpath('Error'):
             self.errorMessage = tree.xpath('.//Error/Message')[0].text
@@ -488,9 +573,14 @@ class GetMatchingProductForId(AmazonMWSCall):
 
     def parse_response(self):
         xml = self.remove_namespaces(self.rawResponse)
-        tree = etree.fromstring(xml)
         xpath_get = AmazonMWSCall.xpath_get
         products = []
+        try:
+            tree = etree.fromstring(xml)
+        except Exception as e:
+            self.errorMessage = str(e)
+            self.succeeded = False
+            return
 
         for result_tag in tree.iterdescendants('GetMatchingProductForIdResult'):
             product = {}
@@ -531,12 +621,10 @@ class GetMatchingProductForId(AmazonMWSCall):
         self.products = products
 
         # If at least one ID succeeded, mark the API call as succeeded
-        for p in products:
-            if len(p) > 2:
-                self.succeeded = True
-                return
+        if [1 for p in products if 'error' not in p] and len(products):
+            self.succeeded = True
         else:
-            self.errorMessage = 'GetMatchingProductForId returned no results, or all results were errors.'
+            self.errorMessage = xpath_get(tree, './/Error/Message')
             self.succeeded = False
 
 
@@ -570,9 +658,14 @@ class GetCompetitivePricingForASIN(AmazonMWSCall):
 
     def parse_response(self):
         xml = self.remove_namespaces(self.rawResponse)
-        tree = etree.fromstring(xml)
         xpath_get = AmazonMWSCall.xpath_get
         prices = []
+        try:
+            tree = etree.fromstring(xml)
+        except Exception as e:
+            self.errorMessage = str(e)
+            self.succeeded = False
+            return
 
         for result_tag in tree.iterdescendants('GetCompetitivePricingForASINResult'):
             price = {}
@@ -606,12 +699,10 @@ class GetCompetitivePricingForASIN(AmazonMWSCall):
         self.prices = prices
 
         # If at least one ID succeeded, mark the api call as a success
-        for p in prices:
-            if 'error' not in p:
-                self.succeeded = True
-                return
+        if [1 for p in prices if 'error' not in p] and len(prices):
+            self.succeeded = True
         else:
-            self.errorMessage = 'GetCompetitivePricingForASIN returned no results, or all results were errors.'
+            self.errorMessage = xpath_get(tree, './/Error/Message')
             self.succeeded = False
 
     def update_product(self, product):
@@ -625,7 +716,11 @@ class GetCompetitivePricingForASIN(AmazonMWSCall):
         list_price = price_group.get('listing_price', None)
         shipping = price_group.get('shipping', 0)
 
-        product.price = landed_price if landed_price is not None else list_price + shipping
+        if landed_price is not None:
+            product.price = landed_price
+        elif list_price is not None:
+            product.price = list_price + shipping
+
         return True
 
     @qtc.pyqtSlot(Product, result=bool)
@@ -690,7 +785,7 @@ class GetMyFeesEstimate(AmazonMWSCall):
         try:
             tree = etree.fromstring(xml)
         except Exception as e:
-            self.feeTotals = []
+            self.errorMessage = str(e)
             self.succeeded = False
             return
 
@@ -711,7 +806,7 @@ class GetMyFeesEstimate(AmazonMWSCall):
 
         self.feeTotals = totals
 
-        if (1 for t in totals if 'error' not in t) and len(totals):
+        if [1 for t in totals if 'error' not in t] and len(totals):
             self.succeeded = True
         else:
             self.errorMessage = xpath_get(tree, './/Error/Message')
@@ -746,9 +841,14 @@ class ItemLookup(AmazonMWSCall):
 
     def parse_response(self):
         xml = self.remove_namespaces(self.rawResponse)
-        tree = etree.fromstring(xml)
         xpath_get = AmazonMWSCall.xpath_get
         products = []
+        try:
+            tree = etree.fromstring(xml)
+        except Exception as e:
+            self.errorMessage = str(e)
+            self.succeeded = False
+            return
 
         for error_tag in tree.iterdescendants('Error'):
             message = xpath_get(error_tag, './/Message')
@@ -771,7 +871,7 @@ class ItemLookup(AmazonMWSCall):
                             or xpath_get(item_tag, './/MPN')\
                             or xpath_get(item_tag, './/PartNumber')
             product['NumberOfItems'] = xpath_get(item_tag, './/NumberOfItems', _type=int)
-            product['PackagedQuantity'] = xpath_get(item_tag, './/PackageQuantity', _type=int)
+            product['PackageQuantity'] = xpath_get(item_tag, './/PackageQuantity', _type=int)
             product['title'] = xpath_get(item_tag, './/Title')
             product['upc'] = xpath_get(item_tag, './/UPC')
             price = xpath_get(item_tag, './/LowestNewPrice/Amount', _type=float)
@@ -790,7 +890,7 @@ class ItemLookup(AmazonMWSCall):
     def update_product(self, product, except_price=False):
         sku = product.sku
         try:
-            update = dict([pg for pg in self.prices if pg['sku'] == sku][0])
+            update = dict([p for p in self.products if p['sku'] == sku][0])
         except (KeyError, IndexError):
             return False
 
@@ -804,3 +904,186 @@ class ItemLookup(AmazonMWSCall):
     def updateProduct(self, product):
         return self.update_product(product)
 
+
+########################################################################################################################
+
+
+class ProductHistory(qp.MapObject):
+    __collection__ = 'product_history'
+
+    productChanged = qtc.pyqtSignal()
+    product = qp.MapObjectProperty('product', _type=qp.MapObjectReference, notify=productChanged)
+
+    historyChanged = qtc.pyqtSignal()
+    history = qp.ListProperty('history', default=lambda s: list(), default_set=True, notify=historyChanged)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._daterange_min = None
+        self._daterange_max = None
+        self._rank_points = []
+        self._price_points = []
+        self._min_datetime = None
+        self._max_datetime = None
+        self._min_rank = None
+        self._max_rank = None
+        self._min_price = None
+        self._max_price = None
+        self._avg_rank = None
+        self._avg_price = None
+        self.refresh()
+
+    @qtc.pyqtSlot()
+    def refresh(self):
+        points = (p for p in self.history)
+
+        if self._daterange_min:
+            points = (p for p in points if p['timestamp'] >= self._daterange_min)
+        if self._daterange_max:
+            points = (p for p in points if p['timestamp'] <= self._daterange_max)
+
+        rank_points = []
+        price_points = []
+        min_datetime = None
+        max_datetime = None
+        min_rank = 0
+        max_rank = 0
+        min_price = 0
+        max_price = 0
+        rank_total, rank_count = 0, 0
+        price_total, price_count = 0, 0
+
+        for p in points:
+            time_dt = p['timestamp']
+            time_ms = time_dt.timestamp() * 1000
+
+            if min_datetime is None or time_dt < min_datetime:
+                min_datetime = time_dt
+            if max_datetime is None or time_dt > max_datetime:
+                max_datetime = time_dt
+
+            rank = p.get('rank', None)
+            if rank is not None:
+                rank_points.append({'x': time_ms, 'y': rank})
+                min_rank = rank if rank < min_rank else min_rank
+                max_rank = rank if rank > max_rank else max_rank
+                rank_total += rank
+                rank_count += 1
+
+            price = p.get('price', None)
+            if price is not None:
+                price_points.append({'x': time_ms, 'y': price})
+                min_price = price if price < min_price else min_price
+                max_price = price if price > max_price else max_price
+                price_total += price
+                price_count += 1
+
+        self._min_datetime = min_datetime
+        self._max_datetime = max_datetime
+
+        self._rank_points = rank_points
+        if rank_points:
+            self._min_rank = min_rank
+            self._max_rank = max_rank
+            self._avg_rank = int(round(rank_total / rank_count, 0))
+        else:
+            self._min_rank = None
+            self._max_rank = None
+            self._avg_rank = None
+
+        self._price_points = price_points
+        if price_points:
+            self._min_price = min_price
+            self._max_price = max_price
+            self._avg_price = price_total / price_count
+        else:
+            self._min_price = None
+            self._max_price = None
+            self._avg_price = None
+
+        self.minDateTimeChanged.emit()
+        self.maxDateTimeChanged.emit()
+
+        self.rankPointsChanged.emit()
+        self.minRankChanged.emit()
+        self.maxRankChanged.emit()
+        self.averageRankChanged.emit()
+
+        self.pricePointsChanged.emit()
+        self.minPriceChanged.emit()
+        self.maxPriceChanged.emit()
+        self.averagePriceChanged.emit()
+
+    def add_to_history(self, product):
+        """Adds the current state of product to the product history."""
+        now = datetime.now(tz=get_localzone())
+
+        self.history.append(
+            {
+                'timestamp': now,
+                'rank': product.rank,
+                'price': product.price,
+            }
+        )
+
+    minDateTimeChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=minDateTimeChanged)
+    def minDateTime(self):
+        return qtc.QDateTime(self._min_datetime) if self._min_datetime else None
+
+    maxDateTimeChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=maxDateTimeChanged)
+    def maxDateTime(self):
+        return qtc.QDateTime(self._max_datetime) if self._max_datetime else None
+
+    @qtc.pyqtSlot(qtc.QVariant, qtc.QVariant)
+    def setDateRange(self, min_date, max_date):
+        if isinstance(min_date, qtc.QDateTime):
+            min_date = min_date.toPyDateTime().replace(tzinfo=get_localzone())
+        if isinstance(max_date, qtc.QDateTime):
+            max_date = max_date.toPyDateTime().replace(tzinfo=get_localzone())
+
+        self._daterange_min = min_date
+        self._daterange_max = max_date
+
+        self.refresh()
+
+    rankPointsChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=rankPointsChanged)
+    def rankPoints(self):
+        return self._rank_points
+
+    minRankChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=minRankChanged)
+    def minRank(self):
+        return self._min_rank
+
+    maxRankChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=maxRankChanged)
+    def maxRank(self):
+        return self._max_rank
+
+    averageRankChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=averageRankChanged)
+    def averageRank(self):
+        return self._avg_rank
+
+    pricePointsChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=pricePointsChanged)
+    def pricePoints(self):
+        return self._price_points
+
+    minPriceChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=minPriceChanged)
+    def minPrice(self):
+        return self._min_price
+
+    maxPriceChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=maxPriceChanged)
+    def maxPrice(self):
+        return self._max_price
+
+    averagePriceChanged = qtc.pyqtSignal()
+    @qtc.pyqtProperty(qtc.QVariant, notify=averagePriceChanged)
+    def averagePrice(self):
+        return self._avg_price

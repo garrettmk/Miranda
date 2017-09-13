@@ -106,6 +106,23 @@ class MirandaDatabase(qp.MongoDatabase):
         sip.transferto(q, q)
         return q
 
+    def new_product_history_query(self, query=None, sort=None):
+        """Helper method for creating product history queries."""
+        query = {} if query is None else query
+        sort = {} if sort is None else sort
+        return ObjectQuery(objectType='ProductHistory',
+                           query=ProductHistoryQueryDocument(**query))
+
+    @qtc.pyqtSlot(qtc.QVariant, result=ObjectQuery)
+    def newProductHistoryQuery(self, product=None):
+        """Frontend for using new_product_history_query() from QML."""
+        q = self.new_product_history_query()
+        if product is not None:
+            q.query.product = product
+
+        sip.transferto(q, q)
+        return q
+
     def new_opportunity_query(self, query=None, sort=None):
         """Helper method for creating a basic relationship query."""
         query = {} if query is None else query
@@ -161,6 +178,20 @@ class MirandaDatabase(qp.MongoDatabase):
         sip.transferto(val, val)
         return val
 
+    def clear_op_logs(self, op):
+        """Clears product operation logs of any stamps made by op."""
+        kind = qp.MapObject.subclass(op.objectQuery.objectType)
+        collection = self._get_collection(kind.__collection__)
+        collection.update_many(
+            {'operation_log': {'$exists': True}},
+            {'$pull': {'operation_log': {'operation_id': op._id}}}
+        )
+
+    @qtc.pyqtSlot(ObjectOperation)
+    def clearOpLogs(self, op):
+        """QML frontend for clear_op_logs()."""
+        self.clear_op_logs(op)
+
 
 ########################################################################################################################
 
@@ -168,7 +199,7 @@ class MirandaDatabase(qp.MongoDatabase):
 class MirandaApp(qp.App):
 
     register_classes = [FileImportHelper,
-                        Validator]
+                        ProductValidator]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

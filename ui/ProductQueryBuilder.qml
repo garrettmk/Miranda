@@ -22,6 +22,7 @@ Item {
             maxRankField.text = ""
             feedbackField.text = ""
             sortFieldBox.currentIndex = 0
+            tagsEditor.model = []
         } else {
             textSearchField.text = query.query.textSearch !== undefined ? query.query.textSearch : ""
             vendorBox.currentVendor = query.query.vendor
@@ -32,6 +33,7 @@ Item {
             minRankField.text = query.query.minRank !== undefined ? query.query.minRank : ""
             maxRankField.text = query.query.maxRank !== undefined ? query.query.maxRank : ""
             feedbackField.text = query.query.feedback !== undefined ? query.query.feedback : ""
+            tagsEditor.model = query.query.tags !== undefined ? query.query.tags : []
 
             if (query.sort.title !== undefined) {
                 sortFieldBox.currentIndex = 1
@@ -84,6 +86,7 @@ Item {
             query.query.minRank = minRankField.text ? parseInt(minRankField.text) : undefined
             query.query.maxRank = maxRankField.text ? parseInt(maxRankField.text) : undefined
             query.query.feedback = feedbackField.text ? parseFloat(feedbackField.text) : undefined
+            query.query.tags = tagsEditor.model.length ? tagsEditor.model : undefined
 
             _clear_sorts(query)
             var sortIdx = sortFieldBox.currentIndex

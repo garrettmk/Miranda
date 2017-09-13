@@ -221,10 +221,11 @@ M.CenteredModalDialog {
                         Layout.fillWidth: true
                         elide: Text.ElideRight
                     }
-                    M.Label {
+                    M.LinkLabel {
                         type: "Caption"
                         visible: helper.currentProduct !== undefined && !helper.complete
-                        text: helper.currentProduct !== undefined ? "<a href=\"" + helper.currentProduct.detailPageUrl + "\">" + helper.currentProduct.detailPageUrl + "</a>" : "(n/a)"
+                        text: helper.currentProduct !== undefined ? helper.currentProduct.detailPageUrl : "n/a"
+                        link: helper.currentProduct !== undefined ? helper.currentProduct.detailPageUrl : ""
                         Layout.fillWidth: true
                         elide: Text.ElideRight
                         textFormat: Text.StyledText

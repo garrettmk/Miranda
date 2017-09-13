@@ -20,7 +20,7 @@ M.CenteredModalDialog {
 
         ComboBox {
             id: typeBox
-            model: ["DummyOperation", "FindMarketMatches", "UpdateProducts"]
+            model: ["DummyOperation", "FindMarketMatches", "UpdateProducts", "UpdateOpportunities"]
             Layout.fillWidth: true
         }
     }

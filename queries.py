@@ -162,8 +162,17 @@ class OpportunityQueryDocument(qp.MongoQueryDocument):
     marketListingChanged = qtc.pyqtSignal()
     marketListing = qp.QueryReferenceProperty('market_listing', notify=marketListingChanged)
 
+    minMarketRankChanged = qtc.pyqtSignal()
+    minMarketRank = qp.QueryProperty('market_listing.rank', 'range_min', notify=minMarketRankChanged)
+
+    maxMarketRankChanged = qtc.pyqtSignal()
+    maxMarketRank = qp.QueryProperty('market_listing.rank', 'range_max', notify=maxMarketRankChanged)
+
     supplierListingChanged = qtc.pyqtSignal()
     supplierListing = qp.QueryReferenceProperty('supplier_listing', notify=supplierListingChanged)
+
+    minSimilarityChanged = qtc.pyqtSignal()
+    minSimilarity = qp.QueryProperty('similarity_score', 'range_min', notify=minSimilarityChanged)
 
     minProfitChanged = qtc.pyqtSignal()
     minProfit = qp.QueryProperty('profit', 'range_min', notify=minProfitChanged)
@@ -182,6 +191,9 @@ class OpportunitySortDocument(qp.MongoSortDocument):
 
     marketVendorChanged = qtc.pyqtSignal()
     marketVendor = qp.SortProperty('market_listing.vendor_id', notify=marketVendorChanged)
+
+    marketRankChanged = qtc.pyqtSignal()
+    marketRank = qp.SortProperty('market_listing.rank', notify=marketRankChanged)
 
     supplierVendorChanged = qtc.pyqtSignal()
     supplierVendor = qp.SortProperty('supplier_listing.vendor_id', notify=supplierVendorChanged)
@@ -230,3 +242,12 @@ class OperationSortDocument(qp.MongoSortDocument):
 
     typeChanged = qtc.pyqtSignal()
     type = qp.SortProperty('_type', notify=typeChanged)
+
+
+########################################################################################################################
+
+
+class ProductHistoryQueryDocument(qp.MongoQueryDocument):
+
+    productChanged = qtc.pyqtSignal()
+    product = qp.QueryReferenceProperty('product', notify=productChanged)
